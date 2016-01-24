@@ -29,13 +29,13 @@ RESB  18              ; 先空出18字节
 entry:
   MOV   AX,0          ; 初始化寄存器
   MOV   SS,AX
-  MOV   SP,0x7c00
-  MOV   DS,AX
-  MOV   ES,AX
-  MOV   SI,msg
+  MOV   SP,0x7c00     ; SP 段偏移寄存器。本例中所有程序都在同一段内，且首地址为0x7c00
+  MOV   DS,AX         ; DX 数据段寄存器
+  MOV   ES,AX         ; ES 附加段寄存器
+  MOV   SI,msg        ; SI指向待输出数据所在位置
 
 putloop:
-  MOV   AL,[SI]
+  MOV   AL,[SI]       ; [SI]读取的是[SP:SI]位置的数据
   ADD   SI,1          ; SI ++
   CMP   AL,0
   JE    fin           ; 若AL = 0 则停止工作. 此处若改为JE entry则可无限向屏幕写入字符串
