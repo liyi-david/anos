@@ -42,7 +42,7 @@
     42 00000062 B500                      mov CH, 0                   ; 柱面 0
     43 00000064 B600                      mov DH, 0                   ; 磁头 0
     44 00000066 B102                      mov CL, 2                   ; 扇区 2
-    45 00000068 B001                      mov AL, 0x01                ; 读入扇区数
+    45 00000068 B001                      mov AL, 1                   ; 读入扇区数
     46 0000006A BB0000                    mov BX, 0
     47 0000006D B200                      mov DL, 0x00                ; A驱动器
     48 0000006F B402                      mov AH, 0x02                ; 中断参数：读操作
@@ -55,43 +55,44 @@
     55 00000078 EBFD                      jmp fin                     ; 死循环
     56                                  
     57                                  success:                      ; 成功读取
-    58 0000007A B8[B800]                  mov AX, succmsg
+    58 0000007A B8[BA00]                  mov AX, succmsg
     59 0000007D 89C5                      mov BP, AX
     60 0000007F B91100                    mov CX, succmsglen
     61 00000082 EB08                      jmp display
     62                                  error:                        ; 出现错误
-    63 00000084 B8[9E00]                  mov AX, errmsg
+    63 00000084 B8[A000]                  mov AX, errmsg
     64 00000087 89C5                      mov BP, AX
     65 00000089 B91A00                    mov CX, errmsglen
     66                                  
     67                                  ; ---------------------------- 显示信息：公用代码 ------------------------------------------------
     68                                  
     69                                  display:
-    70 0000008C B8007C                    mov AX, 0x7c00
-    71 0000008F 8EC0                      mov ES, AX                  ; 将会显示从ES:BP开始的字符串
-    72 00000091 B001                      mov AL, 0x01                ; 目标位置包含字符，且属性在BL中包含，参见
-    73                                                                ; http://blog.csdn.net/pdcxs007/article/details/43378229
-    74 00000093 B700                      mov BH, 0                   ; 视频区页数
-    75 00000095 BA0000                    mov DX, 0                   ; DH = 行数, DL = 列数，此处显示位置为 0,0
-    76 00000098 B301                      mov BL, 0x01
-    77 0000009A B413                      mov AH, 0x13                ; 显示中断参数：显示字符串
-    78 0000009C CD10                      int 0x10                    ; 调用显示中断
-    79                                  
-    80                                  
-    81                                  errmsg:
-    82 0000009E 6572726F7220666F75-       db "error found while reading"
-    83 000000A7 6E64207768696C6520-
-    84 000000B0 72656164696E67     
-    85 000000B7 0A                        db 0x0a
-    86                                  errmsglen equ $ - errmsg
-    87                                  succmsg:
-    88 000000B8 66696E697368656420-       db "finished reading"
-    89 000000C1 72656164696E67     
-    90 000000C8 0A                        db 0x0a
-    91                                  succmsglen equ $ - succmsg
-    92                                  
-    93 000000C9 00<rept>                TIMES (0x01FE-($-$$)) db 0    ; 填充当前扇区。不知道为何原文给定的填充结束位置为0x7dfe
-    94                                                                ; 不过这个填充位置显然是错的，因为这样55AA标志便远在引导扇区之外
-    95                                                                ; 因此我们将填充位置改为 0x01FE，因为 0x01FE + 2 = 0x0200恰好为
-    96                                                                ; 第一个扇区的长度
-    97 000001FE 55AA                    DB    0x55, 0xaa
+    70 0000008C B80000                    mov AX, 0                   ; 不可以使用0x7c00, 由于本程序使用了 org 0x7c00指令，因此 succmsg
+    71                                                                ; 或者errmsg已经从文件中的相对位置向后偏移了0x7c00
+    72 0000008F 8EC0                      mov ES, AX                  ; 将会显示从ES:BP开始的字符串
+    73 00000091 B001                      mov AL, 0x01                ; 目标位置包含字符，且属性在BL中包含，参见
+    74                                                                ; http://blog.csdn.net/pdcxs007/article/details/43378229
+    75 00000093 B700                      mov BH, 0                   ; 视频区页数
+    76 00000095 BA0000                    mov DX, 0                   ; DH = 行数, DL = 列数，此处显示位置为 0,0
+    77 00000098 B3FC                      mov BL, 0xFC
+    78 0000009A B413                      mov AH, 0x13                ; 显示中断参数：显示字符串
+    79 0000009C CD10                      int 0x10                    ; 调用显示中断
+    80 0000009E EBD7                      jmp fin
+    81                                  
+    82                                  errmsg:
+    83 000000A0 6572726F7220666F75-       db "error found while reading"
+    84 000000A9 6E64207768696C6520-
+    85 000000B2 72656164696E67     
+    86 000000B9 0A                        db 0x0a
+    87                                  errmsglen equ $ - errmsg
+    88                                  succmsg:
+    89 000000BA 66696E697368656420-       db "finished reading"
+    90 000000C3 72656164696E67     
+    91 000000CA 0A                        db 0x0a
+    92                                  succmsglen equ $ - succmsg
+    93                                  
+    94 000000CB 00<rept>                TIMES (0x01FE-($-$$)) db 0    ; 填充当前扇区。不知道为何原文给定的填充结束位置为0x7dfe
+    95                                                                ; 不过这个填充位置显然是错的，因为这样55AA标志便远在引导扇区之外
+    96                                                                ; 因此我们将填充位置改为 0x01FE，因为 0x01FE + 2 = 0x0200恰好为
+    97                                                                ; 第一个扇区的长度
+    98 000001FE 55AA                    DB    0x55, 0xaa

@@ -40,7 +40,7 @@ entry:
   mov CH, 0                   ; 柱面 0
   mov DH, 0                   ; 磁头 0
   mov CL, 2                   ; 扇区 2
-  mov AL, 0x01                ; 读入扇区数
+  mov AL, 1                   ; 读入扇区数
   mov BX, 0
   mov DL, 0x00                ; A驱动器
   mov AH, 0x02                ; 中断参数：读操作
@@ -48,7 +48,7 @@ entry:
   jc error
   jmp success
 
-fin:
+fin:                          ; 程序结束
   hlt
   jmp fin                     ; 死循环
 
@@ -65,16 +65,19 @@ error:                        ; 出现错误
 ; ---------------------------- 显示信息：公用代码 ------------------------------------------------
 
 display:
-  mov AX, 0x7c00
+  mov AX, 0                   ; 不可以使用0x7c00, 由于本程序使用了 org 0x7c00指令，因此 succmsg
+                              ; 或者errmsg已经从文件中的相对位置向后偏移了0x7c00
   mov ES, AX                  ; 将会显示从ES:BP开始的字符串
   mov AL, 0x01                ; 目标位置包含字符，且属性在BL中包含，参见
                               ; http://blog.csdn.net/pdcxs007/article/details/43378229
   mov BH, 0                   ; 视频区页数
   mov DX, 0                   ; DH = 行数, DL = 列数，此处显示位置为 0,0
-  mov BL, 0x01
+  mov BL, 0xFC
   mov AH, 0x13                ; 显示中断参数：显示字符串
   int 0x10                    ; 调用显示中断
+  jmp fin
 
+; ---------------------------------------- 数据段 ------------------------------------------------
 
 errmsg:
   db "error found while reading"
