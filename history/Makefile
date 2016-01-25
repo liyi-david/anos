@@ -22,11 +22,12 @@ d3:./target/d3/image.img
 	sudo mkdir -p /mnt/img
 	sudo mount -o rw ./target/d3/image.img /mnt/img
 	sudo cp ./target/d3/app.sys /mnt/img/
-	sudo umount /mnt/img
-	sudo rmdir /mnt/img
+	# -l option for lazy umount
+	sudo umount /mnt/img -l
+	sudo rm -rf /mnt/img
 
 d3run:d3
 	qemu-system-i386 -fda ./target/d3/image.img
 
 d3debug:d3
-	qemu-system-i386 -fda ./target/d3/image.img -s -S &
+	qemu-system-i386 -fda ./target/d3/image.img -S -monitor stdio

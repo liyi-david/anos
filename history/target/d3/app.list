@@ -20,78 +20,115 @@
     20                                                                ; difference between call and jmp should be noticed properly
     21                                  
     22                                  protected:                    ; try to switch into protected mode
-    23 00000023 6631C0                    xor EAX, EAX                ; assign 0 to EAX
-    24 00000026 8CC8                      mov AX, CS                  ; the lower 16-bits of EAX set to the base address of current seg
+    23 00000023 6631C0                    xor EAX, EAX                ; 清空EAX寄存器
+    24 00000026 8CC8                      mov AX, CS                  ; 以下三行计算fin所在线性地址并将其存储到EAX中
     25 00000028 66C1E004                  shl EAX, 4
-    26 0000002C 6605[D4000000]            add EAX, fin                ; obtain the 32-bit address of fin
-    27 00000032 A3[C000]                  mov word [GDT + 10], ax
+    26 0000002C 6605[C3000000]            add EAX, fin
+    27 00000032 A3[AF00]                  mov word [GDT + 10], ax     ; 将fin线性地址转换为保护模式下的段, 前16位基址写入第二个GD的16-31位
     28 00000035 66C1E810                  shr eax, 16
-    29 00000039 A2[C200]                  mov byte [GDT + 12], al
-    30 0000003C 8826[C500]                mov byte [GDT + 15], ah
-    31 00000040 0F0116[CE00]              lgdt [GDTR]
-    32 00000045 FA                        cli
-    33 00000046 E492                      in al, 92h
-    34 00000048 0C02                      or al, 00000010b
-    35 0000004A E692                      out 92h, al                 ; open A20 to address more memory
-    36 0000004C 0F20C0                    mov eax, cr0                ; todo find what has been done
-    37 0000004F 6683C801                  or  eax, 1
-    38 00000053 0F22C0                    mov cr0, eax
-    39 00000056 66EA000000000800          jmp dword codeselector:0    ; jump to a 32-bit section
-    40                                  
-    41                                  display:
-    42 0000005E B80000                    mov AX, 0                   ; 不可以使用0x7c00, 由于本程序使用了 org 0x7c00指令，因此 succmsg
-    43                                                                ; 或者errmsg已经从文件中的相对位置向后偏移了0x7c00
-    44 00000061 8EC0                      mov ES, AX                  ; 将会显示从ES:BP开始的字符串
-    45 00000063 B001                      mov AL, 0x01                ; 目标位置包含字符，且属性在BL中包含，参见
-    46                                                                ; http://blog.csdn.net/pdcxs007/article/details/43378229
-    47 00000065 B700                      mov BH, 0                   ; 视频区页数
-    48 00000067 B302                      mov BL, 0x02
-    49 00000069 B413                      mov AH, 0x13                ; 显示中断参数：显示字符串
-    50 0000006B CD10                      int 0x10                    ; 调用显示中断
-    51 0000006D C3                        ret                         ; return to the corresponding 'call'
-    52                                  
-    53                                  psmsg:
-    54 0000006E 6C6F6164696E672066-       db "loading finished."
-    55 00000077 696E69736865642E   
-    56                                  lenpsmsg equ $ - psmsg
-    57                                  tipmsg:
-    58 0000007F 707265706172696E67-       db "preparing for protected mode (32-bit)."
-    59 00000088 20666F722070726F74-
-    60 00000091 6563746564206D6F64-
-    61 0000009A 65202833322D626974-
-    62 000000A3 292E               
-    63                                  lentipmsg equ $ - tipmsg
-    64                                  finmsg:
-    65 000000A5 70726F6772616D2066-       db "program finished."
-    66 000000AE 696E69736865642E   
-    67                                  lenfinmsg equ $ - finmsg
+    29 00000039 A2[B100]                  mov byte [GDT + 12], al     ; 16-23位基址写入32-39位
+    30 0000003C 8826[B400]                mov byte [GDT + 15], ah     ; 24-32位基址写入55-63位 (每个GD) 共64位
+    31                                  
+    32 00000040 0F0116[BD00]              lgdt [GDTR]                 ; 加载全局段描述表
+    33 00000045 FA                        cli                         ; 关闭中断
+    34                                  
+    35 00000046 E492                      in al, 92h
+    36 00000048 0C02                      or al, 00000010b            ; 打开A20地址线
+    37 0000004A E692                      out 92h, al
+    38                                  
+    39 0000004C 0F20C0                    mov eax, cr0                ; cr0的第0位代表了CPU的工作状态
+    40 0000004F 6683C801                  or  eax, 1                  ; 将第0位设为1
+    41 00000053 0F22C0                    mov cr0, eax                ; 进入保护模式
+    42                                  
+    43 00000056 66EA000000000800          jmp dword codeselector:0    ; jump to a 32-bit section todo
+    44                                  
+    45                                  display:
+    46 0000005E B80000                    mov AX, 0                   ; 不可以使用0x7c00, 由于本程序使用了 org 0x7c00指令，因此 succmsg
+    47                                                                ; 或者errmsg已经从文件中的相对位置向后偏移了0x7c00
+    48 00000061 8EC0                      mov ES, AX                  ; 将会显示从ES:BP开始的字符串
+    49 00000063 B001                      mov AL, 0x01                ; 目标位置包含字符，且属性在BL中包含，参见
+    50                                                                ; http://blog.csdn.net/pdcxs007/article/details/43378229
+    51 00000065 B700                      mov BH, 0                   ; 视频区页数
+    52 00000067 B302                      mov BL, 0x02
+    53 00000069 B413                      mov AH, 0x13                ; 显示中断参数：显示字符串
+    54 0000006B CD10                      int 0x10                    ; 调用显示中断
+    55 0000006D C3                        ret                         ; return to the corresponding 'call'
+    56                                  
+    57                                  psmsg:
+    58 0000006E 6C6F6164696E672066-       db "loading finished."
+    59 00000077 696E69736865642E   
+    60                                  lenpsmsg equ $ - psmsg
+    61                                  tipmsg:
+    62 0000007F 707265706172696E67-       db "preparing for protected mode (32-bit)."
+    63 00000088 20666F722070726F74-
+    64 00000091 6563746564206D6F64-
+    65 0000009A 65202833322D626974-
+    66 000000A3 292E               
+    67                                  lentipmsg equ $ - tipmsg
     68                                  
-    69                                  GDT:                                     ; todo find out what gdt & gdtr is
-    70 000000B6 0000000000000000          dw 0,0,0,0  
-    71                                  
-    72 000000BE 1000                      dw 0x0010  
-    73 000000C0 0000                      dw 0x0000                              ; 可执行/写  
-    74 000000C2 009A                      dw 0x9a00                              ; 从右往左写数据  
-    75 000000C4 CF00                      dw 0x00cf  
-    76                                  
-    77 000000C6 1000                      dw 0x0010  
-    78 000000C8 0080                      dw 0x8000                              ; 可读/写  
-    79 000000CA 0B92                      dw 0x920B                              ; 显存地址为0x0B8000  
-    80 000000CC CF00                      dw 0x00cf  
-    81                                  
-    82                                    codeselector  equ 0x08                 ; selectors
-    83                                    videoselector equ 0x10  
+    69                                  ; ------------------------------------- Global Descriptor -------------------------------------
+    70                                  ; 位置 功能
+    71                                  ; 07     段基址的25-31位
+    72                                  ; 06     由低到高分别为: 4位段限（16-19），1位AVL标志，1位常数0, 1为D/B标志，1位G标志
+    73                                  ; 05     由低到高分别为: 4位TYPE，1位S标志，2位DPL标志，1位P标志
+    74                                  ; 04 ; 03  |- 段基址的0-24位
+    75                                  ; 02 /
+    76                                  ; 01 \   段限的0-15位
+    77                                  ; 00 /
+    78                                  ; 更多描述参见 http://blog.sina.com.cn/s/blog_6730a3aa01010liv.html
+    79                                  ; ---------------------------------------------------------------------------------------------
+    80                                  
+    81                                  GDT:                                     ; GD Table是由一系列的GD组成的，每个描述符8字节，共64位
+    82                                                                           ; GD : Global Descriptor
+    83 000000A5 0000000000000000          dw 0,0,0,0                             ; 第零个GD是null
     84                                  
-    85                                  GDTR:                                    ; GDTR (48bit) is used to store the address of GDT
-    86 000000CE [0000]                    dw $$                                  ; the higher 32 bits store the base address of GDT
-    87 000000D0 [B600]                    dw GDT
-    88 000000D2 0000                      dw 0                                   ; the lower 16 bits store the length limit of GDT
-    89                                  
-    90                                  [BITS 32]
-    91                                  fin:
-    92 000000D4 EB00                      jmp halt
-    93                                  
-    94                                  halt:
-    95 000000D6 F4                        hlt
-    96 000000D7 EBFD                      jmp halt
-    97                                  
+    85                                  CODE_SEG:
+    86                                  
+    87 000000AD FFFF                      dw 0xffff                              ; 记录前16位限长，不在此处初始化 
+    88 000000AF 0000                      dw 0x0000                              ; 记录段基址，不在此处初始化
+    89 000000B1 009A                      dw 0x9a00                              ; 前8位记录基址，不在此处初始化
+    90                                                                           ; 后8位记录：a(type) - 执行，可读；9 - 有效段，最高特权
+    91 000000B3 CF00                      dw 0x00cf                              ; 后8位记录段基址，前4位记录限长的最高4位 
+    92                                                                           ; c = 1100，代表最大限长取实际限长*2^12 (补齐32位)
+    93                                  VIDEO_SEG:
+    94                                  
+    95 000000B5 1000                      dw 0x0010  
+    96 000000B7 0080                      dw 0x8000                              ; 可读/写  
+    97 000000B9 0B92                      dw 0x920B                              ; 显存地址为0x0B8000  
+    98 000000BB CF00                      dw 0x00cf  
+    99                                  
+   100                                    codeselector  equ CODE_SEG - GDT       ; selector of code segment, = 0x08
+   101                                    videoselector equ VIDEO_SEG - GDT      ; selector of video memory, = 0x10
+   102                                  
+   103                                  LENGDT equ $ - GDT
+   104                                  
+   105                                  GDTR:                                    ; GDTR (48bit) is used to store the address of GDT
+   106 000000BD 1700                      dw LENGDT - 1                          ; the lower 16 bits store the length limit of GDT
+   107                                                                           ; 注意：**前面的**才是低位！！！！
+   108 000000BF [A5000000]                dd GDT                                 ; the higher 32 bits store the base address of GDT
+   109                                                                           ; GDTR 顺序错误可能导致致命错误，致使虚拟机不停重启
+   110                                                                           ; 更多资料参考
+   111                                                                           ; http://www.brokenthorn.com/Resources/OSDev8.html
+   112                                  
+   113                                  [BITS 32]
+   114                                  fin:                                     ; 至此进入32位保护模式
+   115 000000C3 66B81000                  mov AX, videoselector
+   116 000000C7 8EE8                      mov GS, AX                             ; GS
+   117 000000C9 BF00000000                mov EDI, (80*0 + 0) * 2                ; 每个字符占2字节，其中一个是属性
+   118 000000CE B40C                      mov AH, 0x0c                           ; 高字节为属性
+   119 000000D0 B057                      mov AL, 'W'                            ; 低字节为字符 'W'
+   120 000000D2 65668907                  mov [gs:edi], AX
+   121 000000D6 BF02000000                mov edi, (80*0 + 1) * 2
+   122 000000DB B40C                      mov AH, 0x0c  
+   123 000000DD B049                      mov al, 'I'                            ; 显示 'I' 
+   124 000000DF 65668907                  mov [gs:edi], ax  
+   125 000000E3 BF04000000                mov edi, (80*0 + 2) * 2  
+   126 000000E8 B40C                      mov ah, 0x0c  
+   127 000000EA B04E                      mov al, 'N'  
+   128 000000EC 65668907                  mov [gs:edi], ax                       ; 显示 'N'
+   129 000000F0 EB00                      jmp halt
+   130                                  
+   131                                  halt:
+   132 000000F2 F4                        hlt
+   133 000000F3 EBFD                      jmp halt
+   134                                  
