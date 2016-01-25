@@ -1,0 +1,97 @@
+     1                                  org 0xc400                          ; 这部分程序将被载入到0xc200位置
+     2                                                                      ; 由于org主要影响的是jmp指令，因此这里不加实际上也算OK
+     3                                  
+     4 00000000 B003                    mov AL, 0x03                        ; colorful textual display mode
+     5 00000002 B400                    mov AH, 0x00
+     6 00000004 CD10                    int 0x10                            ; reset display mode
+     7                                  
+     8                                  entry:
+     9 00000006 B8[6E00]                  mov AX, psmsg
+    10 00000009 89C5                      mov BP, AX
+    11 0000000B B91100                    mov CX, lenpsmsg
+    12 0000000E BA0000                    mov DX, 0                   ; DH = 行数, DL = 列数，此处显示位置为 0,0
+    13 00000011 E84A00                    call display                ; show 'loading finished'
+    14 00000014 B8[7F00]                  mov AX, tipmsg
+    15 00000017 89C5                      mov BP, AX
+    16 00000019 B92600                    mov CX, lentipmsg
+    17 0000001C B601                      mov DH, 0x01                ; DH = 行数, DL = 列数，此处显示位置为 0,0
+    18 0000001E B200                      mov DL, 0x00
+    19 00000020 E83B00                    call display                ; show 'calling passed'
+    20                                                                ; difference between call and jmp should be noticed properly
+    21                                  
+    22                                  protected:                    ; try to switch into protected mode
+    23 00000023 6631C0                    xor EAX, EAX                ; assign 0 to EAX
+    24 00000026 8CC8                      mov AX, CS                  ; the lower 16-bits of EAX set to the base address of current seg
+    25 00000028 66C1E004                  shl EAX, 4
+    26 0000002C 6605[D4000000]            add EAX, fin                ; obtain the 32-bit address of fin
+    27 00000032 A3[C000]                  mov word [GDT + 10], ax
+    28 00000035 66C1E810                  shr eax, 16
+    29 00000039 A2[C200]                  mov byte [GDT + 12], al
+    30 0000003C 8826[C500]                mov byte [GDT + 15], ah
+    31 00000040 0F0116[CE00]              lgdt [GDTR]
+    32 00000045 FA                        cli
+    33 00000046 E492                      in al, 92h
+    34 00000048 0C02                      or al, 00000010b
+    35 0000004A E692                      out 92h, al                 ; open A20 to address more memory
+    36 0000004C 0F20C0                    mov eax, cr0                ; todo find what has been done
+    37 0000004F 6683C801                  or  eax, 1
+    38 00000053 0F22C0                    mov cr0, eax
+    39 00000056 66EA000000000800          jmp dword codeselector:0    ; jump to a 32-bit section
+    40                                  
+    41                                  display:
+    42 0000005E B80000                    mov AX, 0                   ; 不可以使用0x7c00, 由于本程序使用了 org 0x7c00指令，因此 succmsg
+    43                                                                ; 或者errmsg已经从文件中的相对位置向后偏移了0x7c00
+    44 00000061 8EC0                      mov ES, AX                  ; 将会显示从ES:BP开始的字符串
+    45 00000063 B001                      mov AL, 0x01                ; 目标位置包含字符，且属性在BL中包含，参见
+    46                                                                ; http://blog.csdn.net/pdcxs007/article/details/43378229
+    47 00000065 B700                      mov BH, 0                   ; 视频区页数
+    48 00000067 B302                      mov BL, 0x02
+    49 00000069 B413                      mov AH, 0x13                ; 显示中断参数：显示字符串
+    50 0000006B CD10                      int 0x10                    ; 调用显示中断
+    51 0000006D C3                        ret                         ; return to the corresponding 'call'
+    52                                  
+    53                                  psmsg:
+    54 0000006E 6C6F6164696E672066-       db "loading finished."
+    55 00000077 696E69736865642E   
+    56                                  lenpsmsg equ $ - psmsg
+    57                                  tipmsg:
+    58 0000007F 707265706172696E67-       db "preparing for protected mode (32-bit)."
+    59 00000088 20666F722070726F74-
+    60 00000091 6563746564206D6F64-
+    61 0000009A 65202833322D626974-
+    62 000000A3 292E               
+    63                                  lentipmsg equ $ - tipmsg
+    64                                  finmsg:
+    65 000000A5 70726F6772616D2066-       db "program finished."
+    66 000000AE 696E69736865642E   
+    67                                  lenfinmsg equ $ - finmsg
+    68                                  
+    69                                  GDT:                                     ; todo find out what gdt & gdtr is
+    70 000000B6 0000000000000000          dw 0,0,0,0  
+    71                                  
+    72 000000BE 1000                      dw 0x0010  
+    73 000000C0 0000                      dw 0x0000                              ; 可执行/写  
+    74 000000C2 009A                      dw 0x9a00                              ; 从右往左写数据  
+    75 000000C4 CF00                      dw 0x00cf  
+    76                                  
+    77 000000C6 1000                      dw 0x0010  
+    78 000000C8 0080                      dw 0x8000                              ; 可读/写  
+    79 000000CA 0B92                      dw 0x920B                              ; 显存地址为0x0B8000  
+    80 000000CC CF00                      dw 0x00cf  
+    81                                  
+    82                                    codeselector  equ 0x08                 ; selectors
+    83                                    videoselector equ 0x10  
+    84                                  
+    85                                  GDTR:                                    ; GDTR (48bit) is used to store the address of GDT
+    86 000000CE [0000]                    dw $$                                  ; the higher 32 bits store the base address of GDT
+    87 000000D0 [B600]                    dw GDT
+    88 000000D2 0000                      dw 0                                   ; the lower 16 bits store the length limit of GDT
+    89                                  
+    90                                  [BITS 32]
+    91                                  fin:
+    92 000000D4 EB00                      jmp halt
+    93                                  
+    94                                  halt:
+    95 000000D6 F4                        hlt
+    96 000000D7 EBFD                      jmp halt
+    97                                  
