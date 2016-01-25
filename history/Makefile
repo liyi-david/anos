@@ -13,10 +13,10 @@ d2run:d2
 
 d3:./target/d3/image.img
 	
-./target/d3/image.img:./src/d3/ipl.asm ./src/d3/app.asm
+./target/d3/image.img:./src/d3/ipl.asm ./src/d3/app.asm ./src/d3/print.asm
 	mkdir -p ./target/d3
 	nasm ./src/d3/ipl.asm -f bin -o ./target/d3/ipl.bin -l ./target/d3/ipl.list
-	nasm ./src/d3/app.asm -f bin -o ./target/d3/app.sys -l ./target/d3/app.list
+	nasm ./src/d3/app.asm -f bin -o ./target/d3/app.sys -l ./target/d3/app.list -i ./src/d3/
 	cp ./resources/emptyfloppy.img ./target/d3/image.img
 	dd if=./target/d3/ipl.bin of=./target/d3/image.img bs=512 count=1 conv=notrunc
 	sudo mkdir -p /mnt/img

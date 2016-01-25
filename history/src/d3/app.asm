@@ -40,7 +40,7 @@ protected:                    ; try to switch into protected mode
   or  eax, 1                  ; 将第0位设为1
   mov cr0, eax                ; 进入保护模式
 
-  jmp dword codeselector:0    ; jump to a 32-bit section todo
+  jmp dword codeselector:0    ; jump to a 32-bit section
 
 display:
   mov AX, 0                   ; 不可以使用0x7c00, 由于本程序使用了 org 0x7c00指令，因此 succmsg
@@ -108,23 +108,22 @@ GDTR:                                    ; GDTR (48bit) is used to store the add
 
 [BITS 32]
 fin:                                     ; 至此进入32位保护模式
-  mov AX, videoselector
-  mov GS, AX                             ; GS
-  mov EDI, (80*0 + 0) * 2                ; 每个字符占2字节，其中一个是属性
-  mov AH, 0x0c                           ; 高字节为属性
-  mov AL, 'W'                            ; 低字节为字符 'W'
-  mov [gs:edi], AX
-  mov edi, (80*0 + 1) * 2
-  mov AH, 0x0c  
-  mov al, 'I'                            ; 显示 'I' 
-  mov [gs:edi], ax  
-  mov edi, (80*0 + 2) * 2  
-  mov ah, 0x0c  
-  mov al, 'N'  
-  mov [gs:edi], ax                       ; 显示 'N'
-  jmp halt
+  mov bx, videoselector
+  mov cx, codeselector
+  mov edx, succmsg - fin                 ; 由于段首位置指定为fin标签所在，因此这里给定的偏移必须
+                                         ; 是相对于fin的偏移位置
+  mov ah, 0x0c
+  call print
 
 halt:
   hlt
   jmp halt
 
+%include "print.asm"                     ; 导入print.asm定义的函数，用于显示任意字符串
+
+; ---------------------------------- 字符串的定义 ----------------------------------------------
+succmsg:
+  db "Protected Mode Initialized Successfully"
+  db "Enjoy your trip in 32-bit system", 0x0a
+  db "Now this is a good start.", 0x0a
+  db 0                                   ; 0标志着字符串的结束
