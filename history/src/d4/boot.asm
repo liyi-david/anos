@@ -50,8 +50,8 @@ fin:                          ; 程序结束
 %include "floppy.asm"
 
 ; ---------------------------------------- 数据段 ------------------------------------------------
-LoadStr     db "Loading Floppy ... ", 0x00
-RootStr     db "Root Directory Loaded.", 0x00
+LoadStr     db "Loading Floppy ... ", 0x0a, 0x00
+RootStr     db "Root Directory Loaded.", 0x0a, 0x00
 FinishFlag  db " [DONE]", 0x00
 
 TIMES (0x01FE-($-$$)) db 0    ; 填充当前扇区。不知道为何原文给定的填充结束位置为0x7dfe
