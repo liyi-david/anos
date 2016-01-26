@@ -1,29 +1,53 @@
-NOTE: all numbers here are represented in a reversed hex num, e.g.
-2000 = 
+NOTE: all numbers here are represented in a byte-reversed form, e.g.
+2000 = 0x2000
+
 --------------------------------------- ELF HEADER ----------------------------------------------
 0000000: 7f45 4c46 0101 0100 0000 0000 0000 0000  .ELF............
          -------------------- identifying str --------------------
 0000010: 0200 0300 0100 0000 a080 0408 3400 0000  ............4...
          type mach -version- --entry-- --phoff--                    
               ine
-         * phoff: offset of program header table
+         * phoff: offset of program header table, here 0x00000034
 0000020: d801 0000 0000 0000 3400 2000 0300 2800  ........4. ...(.  
          --shoff-- --eflag-- hlen plen pnum slen
-         * shoff: offset of section header table
+         * shoff: offset of section header table, here 0x000001d8
          * eflag: always 0 for IA32 structure
-         * hlen: size of ELF HEADER (in bytes)
+         * hlen: size of ELF HEADER (in bytes), here 0x34
          * plen: size of one program header, here 0x20
          * pnum: number of program header tables, here 3
          * slen: size of one section header, here 0x28
-0000030: 0900 0600 0100 0000 0000 0000 0080 0408  ................
+0000030: 0900 0600                                ....            
          snum sind
          * snum: number of section headers, here 9
          * sind: index of the section which contains all section names
+
+---------------------------- Program Header Table @ 0x00000034 ----------------------------------
+--------------------------------- Program Header 1 ----------------------------------------------
+0000030:           0100 0000 0000 0000 0080 0408      ............
+                   --ptype-- --offset- --vaddr--
+         * ptype: type of the segement which is described by the current header (current seg)
+         * offset: the offset (in this file) of the current seg
+         * vaddr: virtual address of the first byte in the current seg, 0x08048000 
 0000040: 0080 0408 6401 0000 6401 0000 0500 0000  ....d...d.......
+         --paddr-- --phlen-- --sglen-- --flags--
+         * paddr: reserved for physical address
+         * phlen: length of the current program header, here 0x00000164
+         * sglen: length of the current segment in memory, here 00000164
+         * flags: some relative flag
+0000030: 0900 0600                                ............    
+         --align--
+         * align: how to align this segment in the memory
+
+--------------------------------- Program Header 2 ----------------------------------------------
+0000030:           0100 0000 0000 0000 0080 0408      ............
 0000050: 0010 0000 0100 0000 6401 0000 6491 0408  ........d...d...
-0000060: 6491 0408 0800 0000 0800 0000 0600 0000  d...............
+0000060: 6491 0408                                d...           .
+--------------------------------- Program Header 3 ----------------------------------------------
+0000060:           0800 0000 0800 0000 0600 0000      ............
 0000070: 0010 0000 51e5 7464 0000 0000 0000 0000  ....Q.td........
-0000080: 0000 0000 0000 0000 0000 0000 0700 0000  ................
+0000080: 0000 0000                                ....            
+-------------------------------------------------------------------------------------------------
+0000080:           0000 0000 0000 0000 0700 0000      ............
 0000090: 1000 0000 0000 0000 0000 0000 0000 0000  ................
 00000a0: 6868 9104 0868 6491 0408 e822 0000 0083  hh...hd...."....
 00000b0: c404 83c3 00b8 0100 0000 cd80 8b54 2408  .............T$.
@@ -44,7 +68,10 @@ NOTE: all numbers here are represented in a reversed hex num, e.g.
 00001a0: 7472 7461 6200 2e73 6873 7472 7461 6200  trtab..shstrtab.
 00001b0: 2e74 6578 7400 2e72 6f64 6174 6100 2e65  .text..rodata..e
 00001c0: 685f 6672 616d 6500 2e64 6174 6100 2e63  h_frame..data..c
-00001d0: 6f6d 6d65 6e74 0000 0000 0000 0000 0000  omment..........
+00001d0: 6f6d 6d65 6e74 0000                      omment..        
+
+--------------------------- TODO ---------------------------------
+00001d0:                     0000 0000 0000 0000          ........
 00001e0: 0000 0000 0000 0000 0000 0000 0000 0000  ................
 00001f0: 0000 0000 0000 0000 0000 0000 0000 0000  ................
 0000200: 1b00 0000 0100 0000 0600 0000 a080 0408  ................

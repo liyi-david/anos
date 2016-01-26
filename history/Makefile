@@ -40,3 +40,21 @@ d4elf: ./target/d4/foobar
 	nasm ./src/d4/foo.asm -f elf -o ./target/d4/foo.o
 	gcc -m32 -c ./src/d4/bar.c -o ./target/d4/bar.o
 	ld -m elf_i386 ./target/d4/foo.o ./target/d4/bar.o -o ./target/d4/foobar
+
+d4: ./target/d4/image.img
+
+d4run:d4
+	qemu-system-i386 -fda ./target/d4/image.img
+
+./target/d4/image.img:./src/d4/boot.asm ./src/d4/fat12.asm
+	mkdir -p ./target/d4
+	nasm ./src/d4/boot.asm -f bin -o ./target/d4/boot.bin -l ./target/d4/boot.list -i ./src/d4/
+	cp ./resources/emptyfloppy.img ./target/d4/image.img
+	dd if=./target/d4/boot.bin of=./target/d4/image.img bs=512 count=1 conv=notrunc
+	sudo mkdir -p /mnt/img
+	sudo mount -o rw ./target/d4/image.img /mnt/img
+	sudo cp ./target/d4/foobar /mnt/img/kernel
+	# -l option for lazy umount
+	sudo umount /mnt/img -l
+	sudo rm -rf /mnt/img
+
