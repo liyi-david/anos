@@ -6,17 +6,36 @@ ORG   0x7c00          ; 引导区加载位置
 jmp entry
 nop
 %include "fat12.asm"
-
 ; ----------------------------------------- 常量定义 ---------------------------------------------
-KernelBaseAddr   equ 0x0800
+StackBaseAddr    equ 0x0800
+KernelBaseAddr   equ 0x1000
 KernelOffsetAddr equ 0x0000
 
 ;------------------------------------------ 程序主体 ---------------------------------------------
 ; BIOS中断表参见 http://www.cnblogs.com/walfud/articles/2980774.html
 entry:
   mov dx, LoadStr
-  call dispstr                ; 显示提示信息
+  call dispstr                                    ; 显示提示信息
+  ; 载入根目录文件表
+  mov sp, StackBaseAddr                           ; stack initialization
+  mov ax, KernelBaseAddr                          ; 设置数据缓冲基地址
+  mov es, ax
+  mov bx, KernelOffsetAddr                        ; 设置数据缓冲偏移
+  mov ax, 20                                      ; 1 - boot sector, 2 - 9, 10 - 18 : FAT
+                                                  ; todo why 20/19 ???????
+  mov cx, CFAT12_RootEntCnt*32/512                ; number of sectors
+  call readsec
+  mov dx, RootStr
+  call dispstr
+  mov dx, KernelBaseAddr
+  add dx, CFAT12_RootItemLen
+  call dispstr
 
+  mov dx, KernelBaseAddr
+  mov ds, dx
+  mov dx, KernelOffsetAddr
+  add dx, CFAT12_RootItemLen
+  call dispstr
   jmp fin
 
 fin:                          ; 程序结束
@@ -27,26 +46,13 @@ fin:                          ; 程序结束
                               ; 要在跳转地址和实际地址之间没有多余的jmp指令，就可以正常运行。但是
                               ; 若跳转地址大于实际地址则无法正常执行
 
-; ---------------------------- 显示信息：公用代码 ------------------------------------------------
-; dispstr函数：采用dx作为输入，在屏幕显示起始位置为dx的字符串
-dispstr:
-  mov si, dx
-
-dispstr_loop:
-  mov al, [cs:si]
-  cmp al, 0
-  je dispstr_end              ; 若AL = 0 则停止工作. 此处若改为JE entry则可无限向屏幕写入字符串
-  mov bl, 01                  ; 选择前景色。不过不切换显示模式的话貌似无用
-  mov ah, 0x0e                ; 选择中断功能：显示字符并后移光标
-  int 0x10                    ; 调用显示中断
-  add si, 1
-  jmp dispstr_loop
-
-dispstr_end:
-  ret
+%include "display.asm"
+%include "floppy.asm"
 
 ; ---------------------------------------- 数据段 ------------------------------------------------
-LoadStr db "Locating Kernel ", 0x00
+LoadStr     db "Loading Floppy ... ", 0x00
+RootStr     db "Root Directory Loaded.", 0x00
+FinishFlag  db " [DONE]", 0x00
 
 TIMES (0x01FE-($-$$)) db 0    ; 填充当前扇区。不知道为何原文给定的填充结束位置为0x7dfe
                               ; 不过这个填充位置显然是错的，因为这样55AA标志便远在引导扇区之外

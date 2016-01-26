@@ -43,51 +43,171 @@
     43                              <1> CFAT12_SecNoOfRoot       equ   19
     44                              <1> CFAT12_SecNoOfFAT1       equ   1
     45                              <1> CFAT12_DeltaSecNo        equ   17
-    46                                  
-    47                                  ; ----------------------------------------- 常量定义 ---------------------------------------------
-    48                                  KernelBaseAddr   equ 0x0800
-    49                                  KernelOffsetAddr equ 0x0000
-    50                                  
-    51                                  ;------------------------------------------ 程序主体 ---------------------------------------------
-    52                                  ; BIOS中断表参见 http://www.cnblogs.com/walfud/articles/2980774.html
-    53                                  entry:
-    54 0000003E BA[5F00]                  mov dx, LoadStr
-    55 00000041 E80600                    call dispstr                ; 显示提示信息
-    56                                  
-    57 00000044 EB00                      jmp fin
-    58                                  
-    59                                  fin:                          ; 程序结束
-    60 00000046 F4                        hlt
-    61 00000047 E9(00C4)                  jmp 0xc400                  ; 跳入app.sys
-    62                                                                ; todo 为什么跳转地址是这个?
-    63                                                                ; 原书所述地址是0xc200，然而实际上由于计算机顺序向后执行命令，因此只
-    64                                                                ; 要在跳转地址和实际地址之间没有多余的jmp指令，就可以正常运行。但是
-    65                                                                ; 若跳转地址大于实际地址则无法正常执行
-    66                                  
-    67                                  ; ---------------------------- 显示信息：公用代码 ------------------------------------------------
-    68                                  ; dispstr函数：采用dx作为输入，在屏幕显示起始位置为dx的字符串
-    69                                  dispstr:
-    70 0000004A 89D6                      mov si, dx
-    71                                  
-    72                                  dispstr_loop:
-    73 0000004C 2E8A04                    mov al, [cs:si]
-    74 0000004F 3C00                      cmp al, 0
-    75 00000051 740B                      je dispstr_end              ; 若AL = 0 则停止工作. 此处若改为JE entry则可无限向屏幕写入字符串
-    76 00000053 B301                      mov bl, 01                  ; 选择前景色。不过不切换显示模式的话貌似无用
-    77 00000055 B40E                      mov ah, 0x0e                ; 选择中断功能：显示字符并后移光标
-    78 00000057 CD10                      int 0x10                    ; 调用显示中断
-    79 00000059 83C601                    add si, 1
-    80 0000005C EBEE                      jmp dispstr_loop
-    81                                  
-    82                                  dispstr_end:
-    83 0000005E C3                        ret
-    84                                  
-    85                                  ; ---------------------------------------- 数据段 ------------------------------------------------
-    86 0000005F 4C6F636174696E6720-     LoadStr db "Locating Kernel ", 0x00
-    87 00000068 4B65726E656C2000   
-    88                                  
-    89 00000070 00<rept>                TIMES (0x01FE-($-$$)) db 0    ; 填充当前扇区。不知道为何原文给定的填充结束位置为0x7dfe
-    90                                                                ; 不过这个填充位置显然是错的，因为这样55AA标志便远在引导扇区之外
-    91                                                                ; 因此我们将填充位置改为 0x01FE，因为 0x01FE + 2 = 0x0200恰好为
-    92                                                                ; 第一个扇区的长度
-    93 000001FE 55AA                    DB    0x55, 0xaa
+    46                              <1> CFAT12_RootEntCnt        equ   224
+    47                              <1> 
+    48                              <1> CFAT12_RootItemLen       equ   32
+    49                                  ; ----------------------------------------- 常量定义 ---------------------------------------------
+    50                                  StackBaseAddr    equ 0x0800
+    51                                  KernelBaseAddr   equ 0x1000
+    52                                  KernelOffsetAddr equ 0x0000
+    53                                  
+    54                                  ;------------------------------------------ 程序主体 ---------------------------------------------
+    55                                  ; BIOS中断表参见 http://www.cnblogs.com/walfud/articles/2980774.html
+    56                                  entry:
+    57 0000003E BA[F500]                  mov dx, LoadStr
+    58 00000041 E83700                    call dispstr                                    ; 显示提示信息
+    59                                    ; 载入根目录文件表
+    60 00000044 BC0008                    mov sp, StackBaseAddr                           ; stack initialization
+    61 00000047 B80010                    mov ax, KernelBaseAddr                          ; 设置数据缓冲基地址
+    62 0000004A 8EC0                      mov es, ax
+    63 0000004C BB0000                    mov bx, KernelOffsetAddr                        ; 设置数据缓冲偏移
+    64 0000004F B81400                    mov ax, 20                                      ; 1 - boot sector, 2 - 9, 10 - 18 : FAT
+    65 00000052 B90E00                    mov cx, CFAT12_RootEntCnt*32/512                ; number of sectors
+    66 00000055 E84F00                    call readsec
+    67 00000058 BA[0901]                  mov dx, RootStr
+    68 0000005B E81D00                    call dispstr
+    69 0000005E BA0010                    mov dx, KernelBaseAddr
+    70 00000061 83C220                    add dx, CFAT12_RootItemLen
+    71 00000064 E81400                    call dispstr
+    72                                  
+    73 00000067 BA0010                    mov dx, KernelBaseAddr
+    74 0000006A 8EDA                      mov ds, dx
+    75 0000006C BA0000                    mov dx, KernelOffsetAddr
+    76 0000006F 83C220                    add dx, CFAT12_RootItemLen
+    77 00000072 E80600                    call dispstr
+    78 00000075 EB00                      jmp fin
+    79                                  
+    80                                  fin:                          ; 程序结束
+    81 00000077 F4                        hlt
+    82 00000078 E9(00C4)                  jmp 0xc400                  ; 跳入app.sys
+    83                                                                ; todo 为什么跳转地址是这个?
+    84                                                                ; 原书所述地址是0xc200，然而实际上由于计算机顺序向后执行命令，因此只
+    85                                                                ; 要在跳转地址和实际地址之间没有多余的jmp指令，就可以正常运行。但是
+    86                                                                ; 若跳转地址大于实际地址则无法正常执行
+    87                                  
+    88                                  %include "display.asm"
+    89                              <1> ; ---------------------------- 显示信息：公用代码 ------------------------------------------------
+    90                              <1> ; dispstr
+    91                              <1> ; - dx 在屏幕显示起始位置为sp:dx的字符串
+    92                              <1> dispstr:
+    93 0000007B 50                  <1>   push ax                     ; NOTE these registers must be stored !!!!!!!!!!!!!!!!!!!!!!!!!!
+    94 0000007C 53                  <1>   push bx
+    95 0000007D 89D6                <1>   mov si, dx
+    96                              <1> 
+    97                              <1> dispstr_loop:
+    98 0000007F 3E8A04              <1>   mov al, [ds:si]
+    99 00000082 3C00                <1>   cmp al, 0
+   100 00000084 740B                <1>   je dispstr_end              ; 若AL = 0 则停止工作. 此处若改为JE entry则可无限向屏幕写入字符串
+   101 00000086 B301                <1>   mov bl, 01                  ; 选择前景色。不过不切换显示模式的话貌似无用
+   102 00000088 B40E                <1>   mov ah, 0x0e                ; 选择中断功能：显示字符并后移光标
+   103 0000008A CD10                <1>   int 0x10                    ; 调用显示中断
+   104 0000008C 83C601              <1>   add si, 1
+   105 0000008F EBEE                <1>   jmp dispstr_loop
+   106                              <1> 
+   107                              <1> dispstr_end:
+   108 00000091 5B                  <1>   pop bx
+   109 00000092 58                  <1>   pop ax
+   110 00000093 C3                  <1>   ret
+   111                              <1> 
+   112                              <1> dispdebug:
+   113 00000094 53                  <1>   push bx
+   114 00000095 50                  <1>   push ax
+   115 00000096 51                  <1>   push cx
+   116 00000097 52                  <1>   push dx
+   117 00000098 88E8                <1>   mov al, ch                   ; show debug information
+   118 0000009A 0430                <1>   add al, 0x30
+   119 0000009C B301                <1>   mov bl, 01
+   120 0000009E B40E                <1>   mov ah, 0x0e
+   121 000000A0 CD10                <1>   int 0x10
+   122 000000A2 5A                  <1>   pop dx
+   123 000000A3 59                  <1>   pop cx
+   124 000000A4 58                  <1>   pop ax
+   125 000000A5 5B                  <1>   pop bx
+   126 000000A6 C3                  <1>   ret
+   127                              <1> 
+   128                              <1> 
+   129                                  %include "floppy.asm"
+   130                              <1> ; 这个文件是用来存放软盘读写的 API
+   131                              <1> ; http://blog.csdn.net/littlehedgehog/article/details/2147361
+   132                              <1> 
+   133                              <1> ; 中断13，AH = 2 - 读取
+   134                              <1> ; 读磁盘
+   135                              <1> ;   AL=扇区数
+   136                              <1> ;   CH,CL=磁盘号,扇区号
+   137                              <1> ;   DH,DL=磁头号,驱动器号
+   138                              <1> ;   ES:BX=数据缓冲区地址  
+   139                              <1> ; Return Value
+   140                              <1> ;   读成功:AH=0
+   141                              <1> ;   AL=读取的扇区数
+   142                              <1> ;   读失败:AH=出错代码
+   143                              <1> 
+   144                              <1> ; readsec 读逻辑扇区
+   145                              <1> ; AX 起始扇区
+   146                              <1> ; CX 待读个数
+   147                              <1> ; ES:BX 数据缓冲区地址
+   148                              <1> readsec:
+   149 000000A7 51                  <1>   push cx
+   150 000000A8 53                  <1>   push bx                             ; since bx is used in following lines, we need to store its
+   151                              <1>                                       ; value temporarily
+   152 000000A9 8A1E[1800]          <1>   mov bl, [FAT12_SecPerTrk]
+   153 000000AD F6F3                <1>   div bl                              ; AX % BL = AH, AX / BL = AL
+   154 000000AF 5B                  <1>   pop bx
+   155 000000B0 88C6                <1>   mov dh, al                          ; 求磁头号
+   156 000000B2 80E601              <1>   and dh, 0x01                        ; 若是偶数，则磁头号为0，否则为1
+   157 000000B5 D0E8                <1>   shr al, 1
+   158 000000B7 88C5                <1>   mov ch, al                          ; 柱面号 or 磁道号 
+   159 000000B9 88E1                <1>   mov cl, ah                          ; 起始扇区号
+   160 000000BB 8A16[2400]          <1>   mov dl, [FAT12_DrvNum]
+   161 000000BF 58                  <1>   pop ax                              ; 将待读个数CX弹到AX中，用AX为计数器
+   162                              <1> 
+   163                              <1> readsec_loop:
+   164 000000C0 50                  <1>   push ax
+   165 000000C1 B001                <1>   mov al, 1                           ; 每次只读1个扇区
+   166 000000C3 B402                <1>   mov ah, 2                           ; 设定为读取磁盘模式
+   167                              <1>   tryread:
+   168                              <1>     ; call dispdebug                  ; dispdebug函数用来输出调试信息
+   169 000000C5 CD13                <1>     int 0x13
+   170 000000C7 72FC                <1>     jc tryread                        ; 若失败则重新读取
+   171 000000C9 58                  <1>   pop ax
+   172 000000CA 81C30002            <1>   add bx, 512                         ; 指针向后一个扇区
+   173 000000CE E80A00              <1>   call readsec_secinc                 ; 扇区自增
+   174 000000D1 83E801              <1>   sub ax, 1                           ; 计数器 -1
+   175 000000D4 83F800              <1>   cmp ax, 0
+   176 000000D7 741B                <1>   je readsec_end
+   177 000000D9 EBE5                <1>   jmp readsec_loop
+   178                              <1> 
+   179                              <1> ; 子函数，使得逻辑扇区+1并计算对应的柱面-磁头-扇区表示
+   180                              <1> readsec_secinc:
+   181 000000DB 80C101              <1>   add cl, 1
+   182 000000DE 80F913              <1>   cmp cl, 19
+   183 000000E1 7510                <1>   jne readsec_secinc_end              ; 若扇区号尚不足19，自增后可直接退出
+   184                              <1>                                       ; 扇区范围为 1-19 [重要!!!!!!!!!!!!!!!!!]
+   185 000000E3 B101                <1>     mov cl, 1                         ; 否则变化磁头号
+   186 000000E5 80FE00              <1>     cmp dh, 0                         ; 若磁头号为0, 则磁道号加1
+   187 000000E8 7504                <1>     jne readsec_secinc_cyninc         ; 若磁头号已经为1, 则磁道号清零并增加柱面号
+   188 000000EA B601                <1>     mov dh, 1                         ; 若磁头号尚未0, 则磁道号+1并退出
+   189 000000EC EB05                <1>     jmp readsec_secinc_end
+   190                              <1>   readsec_secinc_cyninc:              ; 柱面号需+1
+   191 000000EE B600                <1>     mov dh, 0
+   192 000000F0 80C501              <1>     add ch, 1
+   193                              <1>   readsec_secinc_end:
+   194 000000F3 C3                  <1>     ret
+   195                              <1> 
+   196                              <1> readsec_end:
+   197 000000F4 C3                  <1>   ret
+   198                              <1> 
+   199                                  
+   200                                  ; ---------------------------------------- 数据段 ------------------------------------------------
+   201 000000F5 4C6F6164696E672046-     LoadStr     db "Loading Floppy ... ", 0x00
+   202 000000FE 6C6F707079202E2E2E-
+   203 00000107 2000               
+   204 00000109 526F6F742044697265-     RootStr     db "Root Directory Loaded.", 0x00
+   205 00000112 63746F7279204C6F61-
+   206 0000011B 6465642E00         
+   207 00000120 205B444F4E455D00        FinishFlag  db " [DONE]", 0x00
+   208                                  
+   209 00000128 00<rept>                TIMES (0x01FE-($-$$)) db 0    ; 填充当前扇区。不知道为何原文给定的填充结束位置为0x7dfe
+   210                                                                ; 不过这个填充位置显然是错的，因为这样55AA标志便远在引导扇区之外
+   211                                                                ; 因此我们将填充位置改为 0x01FE，因为 0x01FE + 2 = 0x0200恰好为
+   212                                                                ; 第一个扇区的长度
+   213 000001FE 55AA                    DB    0x55, 0xaa

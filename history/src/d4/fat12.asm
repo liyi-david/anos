@@ -34,3 +34,6 @@ CFAT12_RootSectors       equ   14
 CFAT12_SecNoOfRoot       equ   19
 CFAT12_SecNoOfFAT1       equ   1
 CFAT12_DeltaSecNo        equ   17
+CFAT12_RootEntCnt        equ   224
+
+CFAT12_RootItemLen       equ   32

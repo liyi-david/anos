@@ -46,7 +46,7 @@ d4: ./target/d4/image.img
 d4run:d4
 	qemu-system-i386 -fda ./target/d4/image.img
 
-./target/d4/image.img:./src/d4/boot.asm ./src/d4/fat12.asm
+./target/d4/image.img:./src/d4/boot.asm ./src/d4/fat12.asm ./src/d4/floppy.asm ./src/d4/display.asm
 	mkdir -p ./target/d4
 	nasm ./src/d4/boot.asm -f bin -o ./target/d4/boot.bin -l ./target/d4/boot.list -i ./src/d4/
 	cp ./resources/emptyfloppy.img ./target/d4/image.img
