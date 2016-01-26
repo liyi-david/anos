@@ -8,7 +8,7 @@
 print:                           ; 这是一个用来显示字符串的函数
   mov gs, bx                     ; 指定显存段索引
   mov fs, cx                     ; 指定数据段索引
-  mov edi, (80 * 0 + 0) * 2      ; EDI初始化为屏幕左上角的显存偏移
+  mov dh, (80 * 0 + 0) * 2      ; DI初始化为显存偏移，其中高位表示列偏移，低位表示行偏移
   mov esi, edx
 
 printloop:

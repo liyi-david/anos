@@ -124,6 +124,4 @@ halt:
 ; ---------------------------------- 字符串的定义 ----------------------------------------------
 succmsg:
   db "Protected Mode Initialized Successfully"
-  db "Enjoy your trip in 32-bit system", 0x0a
-  db "Now this is a good start.", 0x0a
   db 0                                   ; 0标志着字符串的结束
