@@ -29,11 +29,13 @@ FAT12_FilsSysType  db    "FAT12   "      ; 文件系统类型（8字节）
 ; 一些基于FAT12头的常量定义
 ; ------------------------------------------------------------------------------------------------
 
-CFAT12_SecPerFAT         equ   9
-CFAT12_RootSectors       equ   14
-CFAT12_SecNoOfRoot       equ   19
-CFAT12_SecNoOfFAT1       equ   1
-CFAT12_DeltaSecNo        equ   17
-CFAT12_RootEntCnt        equ   224
+CFAT12_SecPerFAT         equ   9                                            ; number of sectors in each FAT
+CFAT12_RootSectors       equ   CFAT12_RootEntCnt * CFAT12_RootItemLen / 512 ; number of sectors that contains root items
+CFAT12_SecNoOfRoot       equ   CFAT12_SecNoOfFAT1 + 2 * CFAT12_SecPerFAT    ; index of root directory table's starting location
+CFAT12_SecNoOfFAT1       equ   1                                            ; index of FAT1's starting section
+CFAT12_RootEntCnt        equ   224                                          ; maximal number of items in root directory
+CFAT12_SecNoClstZero     equ   CFAT12_SecNoOfRoot + CFAT12_RootSectors - 2  ; the sector index of cluster 0
+                                                                            ; since the data cluster starts from cluster 2
+                                                                            ; we need to decrease 2 here
 
 CFAT12_RootItemLen       equ   32

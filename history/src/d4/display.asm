@@ -48,7 +48,7 @@ dispdebug:
   push cx
   push dx
   push si
-  mov al, al
+  ; mov al, [gs:1]
   ; mov al, '%'                    ; show debug information
   add al, 0x30
   mov bl, 01

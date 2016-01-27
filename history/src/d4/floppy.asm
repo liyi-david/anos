@@ -34,11 +34,11 @@ readsec:
 
 
 readsec_loop:
+  ; call dispdebug                      ; dispdebug函数用来输出调试信息
   push ax
   mov al, 1                           ; 每次只读1个扇区
   mov ah, 2                           ; 设定为读取磁盘模式
   tryread:
-    ; call dispdebug                  ; dispdebug函数用来输出调试信息
     int 0x13
     jc tryread                        ; 若失败则重新读取
   pop ax
