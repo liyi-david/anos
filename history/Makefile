@@ -59,3 +59,25 @@ d4run:d4
 	sudo umount /mnt/img -l
 	sudo rm -rf /mnt/img
 
+d5: ./target/d5/image.img
+
+d5run:d5
+	qemu-system-i386 -fda ./target/d5/image.img
+
+./target/d5/image.img:./target/d5/boot.bin ./target/d5/loader.bin
+	cp ./resources/emptyfloppy.img ./target/d5/image.img
+	dd if=./target/d5/boot.bin of=./target/d5/image.img bs=512 count=1 conv=notrunc
+	sudo mkdir -p /mnt/img
+	sudo mount -o rw ./target/d5/image.img /mnt/img
+	sudo cp ./target/d5/loader.bin /mnt/img/loader.bin
+	# -l option for lazy umount
+	sudo umount /mnt/img -l
+	sudo rm -rf /mnt/img
+	
+./target/d5/boot.bin: ./src/d5/bootloader/*.asm
+	mkdir -p ./target/d5
+	nasm ./src/d5/bootloader/boot.asm -f bin -o ./target/d5/boot.bin -i ./src/d5/bootloader/
+
+./target/d5/loader.bin: ./src/d5/bootloader/*.asm
+	nasm ./src/d5/bootloader/loader.asm -f bin -o ./target/d5/loader.bin -i ./src/d5/bootloader/
+
