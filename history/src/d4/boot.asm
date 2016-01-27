@@ -67,18 +67,17 @@ load_FileAllocationTable:                         ; match found in DS:DX
   call readsec
 
 load_kernel:                                      ; we need to locate the kernel through FAT
+  mov ax, KernelBaseAddr                          ; initialize base address of kernel
+  mov es, ax
+  mov bx, KernelOffsetAddr                        ; initialize offset address of kernel
   pop ax
-  ; mov ax, KernelBaseAddr                          ; initialize base address of kernel
-  ; mov es, ax
-  ; mov bx, KernelOffsetAddr                        ; initialize offset address of kernel
   load_kernel_loop:
-    call dispdebug
     ; obtain the current cluster
-    ; add ax, CFAT12_SecNoClstZero                  ; cluster no. -> sector no.
-    ; mov cx, 1                                     ; one cluster, one time
-    ; call readsec                                  ; read one sector as a cluster
-    ; add bx, [FAT12_BytesPerSec]                   ; move the address pointer
-    ; sub ax, CFAT12_SecNoClstZero                  ; sector no. -> cluster no. before continuing
+    add ax, CFAT12_SecNoClstZero                  ; cluster no. -> sector no.
+    mov cx, 1                                     ; one cluster, one time (very important)
+    call readsec                                  ; read one sector as a cluster
+    add bx, [FAT12_BytesPerSec]                   ; move the address pointer
+    sub ax, CFAT12_SecNoClstZero                  ; sector no. -> cluster no. before continuing
     call nextcluster                              ; find the index of the successing cluster
     cmp ax, 0x0ff0                                ; successor < 0x0ff0, that's good sectors
     jb load_kernel_loop                           ; continue reading
@@ -146,8 +145,8 @@ halt:
 MaxItem       db 0x00
 
 LoadStr       db "Load-", 0x00
-RootStr       db "Locate-", 0x00
-NotFoundStr   db "NoMatch", 0x00
+RootStr       db "Seek-", 0x00
+NotFoundStr   db "404", 0x00
 BrkClusterStr db "BrkCluster", 0x00
 KernalName    db "KERNEL  "
 FinishFlag    db "FIN", 0x00

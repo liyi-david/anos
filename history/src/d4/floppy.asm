@@ -17,6 +17,7 @@
 ; CX 待读个数
 ; ES:BX 数据缓冲区地址
 readsec:
+  push ax
   push dx
   push cx                             ; since bx is used in following lines, we need to store its
   push bx                             ; value temporarily
@@ -68,5 +69,6 @@ readsec_secinc:
 
 readsec_end:
   pop dx
+  pop ax
   ret
 

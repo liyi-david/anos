@@ -42,21 +42,22 @@ dispstr_end:
   ret
 
 ; ----------------------------------- debug functions -------------------------------------------
-dispdebug:
-  push bx
-  push ax
-  push cx
-  push dx
-  push si
-  ; mov al, [gs:1]
-  ; mov al, '%'                    ; show debug information
-  add al, 0x30
-  mov bl, 01
-  mov ah, 0x0e
-  int 0x10
-  pop si
-  pop dx
-  pop cx
-  pop ax
-  pop bx
-  ret
+;dispdebug:
+  ;push bx
+  ;push ax
+  ;push cx
+  ;push dx
+  ;push si
+  ;mov si, bx
+  ;mov al, [es:3]
+  ;; mov al, '%'                    ; show debug information
+  ;; add al, 0x30
+  ;mov bl, 01
+  ;mov ah, 0x0e
+  ;int 0x10
+  ;pop si
+  ;pop dx
+  ;pop cx
+  ;pop ax
+  ;pop bx
+;  ret
