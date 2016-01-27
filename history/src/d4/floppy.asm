@@ -13,14 +13,14 @@
 ;   读失败:AH=出错代码
 
 ; readsec 读逻辑扇区
-; AX 起始扇区
+; AX 起始扇区 (ranges from 0 to 2879)
 ; CX 待读个数
 ; ES:BX 数据缓冲区地址
 readsec:
-  push cx
-  push bx                             ; since bx is used in following lines, we need to store its
-                                      ; value temporarily
-  mov bl, [FAT12_SecPerTrk]
+  push dx
+  push cx                             ; since bx is used in following lines, we need to store its
+  push bx                             ; value temporarily
+  mov bl, [cs:FAT12_SecPerTrk]
   div bl                              ; AX % BL = AH, AX / BL = AL
   pop bx
   mov dh, al                          ; 求磁头号
@@ -28,8 +28,10 @@ readsec:
   shr al, 1
   mov ch, al                          ; 柱面号 or 磁道号 
   mov cl, ah                          ; 起始扇区号
+  add cl, 1                           ; obviously cl in [0, 17] and we need it to be [1, 18]
   mov dl, [FAT12_DrvNum]
   pop ax                              ; 将待读个数CX弹到AX中，用AX为计数器
+
 
 readsec_loop:
   push ax
@@ -65,5 +67,6 @@ readsec_secinc:
     ret
 
 readsec_end:
+  pop dx
   ret
 
