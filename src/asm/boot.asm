@@ -1,10 +1,8 @@
 ; ----------------------------------------- 常量定义 ---------------------------------------------
 %include "memorymap.asm"
-
-;------------------------------------------ 程序主体 ---------------------------------------------
-org   BootLoaderBaseAddr                          ; 引导区加载位置
-                                                  ; 与之相对的详细内存分区可参考 http://www.bioscentral.com/misc/bda.htm
-
+; ------------------------------------------ 程序主体 --------------------------------------------
+; 
+org   BootLoaderBaseAddr
 ;--------------------------------------- FAT12 格式描述 ------------------------------------------
 ; FAT12 引导扇区格式参见 http://blog.sina.com.cn/s/blog_3edcf6b80100cr08.html
 jmp entry
@@ -14,15 +12,13 @@ nop
 ; BIOS中断表参见 http://www.cnblogs.com/walfud/articles/2980774.html
 
 entry:
+  ; 刷新屏幕
   call clearscreen
-
-  mov dx, LoadStr
-  call dispstr                                    ; 显示提示信息
-
-  mov ax, StackBaseAddr                           ; 初始化堆栈
+  ; 初始化堆栈
+  mov ax, StackBaseAddr
   mov ss, ax
-
-  ; the following 4 lines shows how to call the loadfile function
+  ; 指定输入文件地址
+  mov ax, LoaderName
   mov bx, LoaderBaseAddr
   mov cx, LoaderOffsetAddr
   call loadfile
@@ -37,10 +33,9 @@ fin:                          ; 程序结束
 
 %include "display.asm"
 %include "floppy.asm"
-
 ; ---------------------------------------- 数据段 ------------------------------------------------
-LoadStr       db "L - ", 0x00
 FinishFlag    db "F", 0x00
+LoaderName    db "LOADER  "
 
 TIMES (0x01FE-($-$$)) db 0    ; 填充当前扇区。不知道为何原文给定的填充结束位置为0x7dfe
                               ; 不过这个填充位置显然是错的，因为这样55AA标志便远在引导扇区之外

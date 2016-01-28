@@ -1,5 +1,4 @@
 ; ---------------------------- 显示信息：公用代码 ------------------------------------------------
-
 clearscreen:
   push ax
   push bx
@@ -21,6 +20,7 @@ clearscreen:
 dispstr:
   push ax                     ; NOTE these registers must be stored !!!!!!!!!!!!!!!!!!!!!!!!!!
   push bx
+  push si
   mov si, dx
 
 dispstr_loop:
@@ -34,6 +34,7 @@ dispstr_loop:
   jmp dispstr_loop
 
 dispstr_end:
+  pop si
   pop bx
   pop ax
   ret
@@ -45,9 +46,8 @@ dispdebug:
   push cx
   push dx
   push si
-  mov si, bx
-  mov al, al                    ; show debug information
-  ; add al, 0x30
+  ; mov al, [es:0]                    ; show debug information
+  add al, 0x30
   mov bl, 01
   mov ah, 0x0e
   int 0x10

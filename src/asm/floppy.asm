@@ -5,67 +5,73 @@ loadfile:
   ; 载入根目录文件表
   push cx
   push bx
+  push ax
   mov ax, FATBaseAddr                             ; 设置数据缓冲基地址
   mov es, ax
   mov bx, FATOffsetAddr                           ; 设置数据缓冲偏移
   mov ax, CFAT12_SecNoOfRoot                      ; 0 - boot sector, 1 - 9/10 - 18 : FAT1/2
   mov cx, CFAT12_RootSectors                      ; number of sectors
   call readsec                                    ; obtain the root directory items
-
+  ; 根目录载入完毕
   mov dx, RootStr
-  call dispstr                                    ; notice the users that we've finished the items
-
-  mov dx, FATOffsetAddr                           ; dx is initialized as Offset - Itemlen
+  call dispstr
+  ; 接下来查找根目录中的全部224项，检查是否存在指定名称的字符串
+  mov dx, FATOffsetAddr
   sub dx, CFAT12_RootItemLen
   mov si, dx
   mov byte [MaxItem], CFAT12_RootEntCnt           ; maximal iteration limit
 
+; 查找Loader
+; 过程中，es:si始终指向当前根目录项的首位值
+; 首先我们将文件名地址出到di处
+  pop di 
 search_file:
   add si, CFAT12_RootItemLen                      ; jump to next item
   sub byte [MaxItem], 1                           ; decrease the limit counter
   cmp byte [MaxItem], 0
-  je fin_unfound                                  ; we have meet the limit
-  pop di
-  push di                                         ; now di contains the filename
-  cmp dword [es:si], "LOAD"                       ; compare first 4 chars
+  je fin_fail                                     ; we have meet the limit
+  mov eax, [di]
+  cmp dword [es:si], eax                          ; compare first 4 chars
   jne search_file
-  cmp dword [es:si+4], "ER  "
+  mov eax, [di+4]
+  cmp dword [es:si+4], eax
   jne search_file
 
+; 若找到文件，则马上从项目中取出相应的首簇号
 save_clusterNo:
-  mov ax, [gs:si + 26]                            ; no. cluster is located with an offset 26
+  mov ax, [es:si + 26]                            ; no. cluster is located with an offset 26
   push ax                                         ; put the cluster no. in the stack in case it
                                                   ; probably be rewritten by readsec
   ; mov eax, [ds:si + 28]                         ; filelength, currently not used
 
+  ; 提示已经找到匹配的文件
+  mov dx, MatchFound
+  call dispstr
+
 load_FileAllocationTable:                         ; match found in DS:DX
-  mov ax, FATBaseAddr
-  mov es, ax
-  mov gs, ax
   mov bx, FATOffsetAddr
   mov ax, CFAT12_SecNoOfFAT1                      ; we're going to load the first FAT
   mov cx, CFAT12_SecPerFAT
   call readsec
 
-
 load_filebody:                                    ; we need to locate the kernel through FAT
-  pop ax
+  pop ax                                          ; 恢复簇号
   pop bx                                          ; initialize base address of loader.bin (line 7)
   mov es, bx
   pop bx                                          ; initialize offset address of loader.bin (line 6)
   load_loader_loop:
     ; obtain the current cluster
     add ax, CFAT12_SecNoClstZero                  ; cluster no. -> sector no.
-    mov cx, 1                                     ; one cluster, one time (very important)
-    call readsec                                  ; read one sector as a cluster
-    add bx, CFAT12_BytesPerSec                    ; move the address pointer
+      mov cx, 1                                   ; one cluster, one time (very important)
+      call readsec                                ; read one sector as a cluster
+      add bx, CFAT12_BytesPerSec                  ; move the address pointer
     sub ax, CFAT12_SecNoClstZero                  ; sector no. -> cluster no. before continuing
     call nextcluster                              ; find the index of the successing cluster
     cmp ax, 0x0ff0                                ; successor < 0x0ff0, that's good sectors
     jb load_loader_loop                           ; continue reading
     cmp ax, 0x0ff8                                ; if 0x0ff0 <= successor <= 0x0ff7, the cluster is
                                                   ; broken and should not be used
-    jb fin_brokencluster
+    jb fin_fail
     ; otherwise we have finished kernel loading
     ret
     
@@ -84,8 +90,8 @@ nextcluster:
   mov ch, 0                                       ; let CX = CL
   add si, cx                                      ; CX == 0 - pick up the first two bytes, otherwise
                                                   ; the last two bytes (in the 3-byte block)
-  mov al, [gs:si]                                 ; read two bytes
-  mov ah, [gs:si + 1]                             ; high byte in memory to low byte in ax, vise versa
+  mov al, [es:si]                                 ; read two bytes
+  mov ah, [es:si + 1]                             ; high byte in memory to low byte in ax, vise versa
 
   cmp cl, 0
   je nextcluster_fin
@@ -98,13 +104,8 @@ nextcluster_fin:
   pop si
   ret
 
-fin_unfound:                  ; NO Kernels Found !!!!!!
-  mov dx, NotFoundStr
-  call dispstr
-  jmp halt
-
-fin_brokencluster:
-  mov dx, BrkClusterStr
+fin_fail:                  ; NO Kernels Found !!!!!!
+  mov dx, FailStr
   call dispstr
   jmp halt
 
@@ -146,12 +147,11 @@ readsec:
 
 
 readsec_loop:
-  ; call dispdebug                    ; dispdebug函数用来输出调试信息
+  call dispdebug                    ; dispdebug函数用来输出调试信息
   push ax
   mov al, 1                           ; 每次只读1个扇区
   mov ah, 2                           ; 设定为读取磁盘模式
   tryread:
-    call dispdebug
     int 0x13
     jc tryread                        ; 若失败则重新读取
   pop ax
@@ -186,9 +186,9 @@ readsec_end:
 
 ; -------------------------------------- Data Segment -------------------------------------------
 MaxItem       db 0x00                  ; used when searching for certain files
-RootStr       db "Seek - ", 0x00
-NotFoundStr   db "404", 0x00
-BrkClusterStr db "BrkCluster", 0x00
+RootStr       db "Searching", 0x00
+MatchFound    db " -*- ", 0x00
+FailStr       db "FAIL", 0x00
 
 ; ------------------------------------------------------------------------------------------------
 ; 一些基于FAT12头的常量定义
