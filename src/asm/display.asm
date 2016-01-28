@@ -22,7 +22,6 @@ dispstr:
   push ax                     ; NOTE these registers must be stored !!!!!!!!!!!!!!!!!!!!!!!!!!
   push bx
   mov si, dx
-  sub si, $$
 
 dispstr_loop:
   mov al, [cs:si]
@@ -39,4 +38,22 @@ dispstr_end:
   pop ax
   ret
 
-
+; ----------------------------------- debug functions -------------------------------------------
+dispdebug:
+  push bx
+  push ax
+  push cx
+  push dx
+  push si
+  mov si, bx
+  mov al, al                    ; show debug information
+  ; add al, 0x30
+  mov bl, 01
+  mov ah, 0x0e
+  int 0x10
+  pop si
+  pop dx
+  pop cx
+  pop ax
+  pop bx
+ ret

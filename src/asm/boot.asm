@@ -14,6 +14,8 @@ nop
 ; BIOS中断表参见 http://www.cnblogs.com/walfud/articles/2980774.html
 
 entry:
+  call clearscreen
+
   mov dx, LoadStr
   call dispstr                                    ; 显示提示信息
 
@@ -21,15 +23,15 @@ entry:
   mov ss, ax
 
   ; the following 4 lines shows how to call the loadfile function
-  mov ax, LoaderName
   mov bx, LoaderBaseAddr
   mov cx, LoaderOffsetAddr
   call loadfile
 
+  call dispstr
 fin:                          ; 程序结束
   mov dx, FinishFlag
   call dispstr
-  jmp LoaderBaseAddr:LoaderOffsetAddr
+  jmp $
 
 ; --------------------------------------- import libraries ---------------------------------------
 
@@ -37,9 +39,7 @@ fin:                          ; 程序结束
 %include "floppy.asm"
 
 ; ---------------------------------------- 数据段 ------------------------------------------------
-
 LoadStr       db "L - ", 0x00
-LoaderName    db "LOADER  ", 0x00
 FinishFlag    db "F", 0x00
 
 TIMES (0x01FE-($-$$)) db 0    ; 填充当前扇区。不知道为何原文给定的填充结束位置为0x7dfe

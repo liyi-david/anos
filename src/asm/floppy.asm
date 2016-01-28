@@ -5,7 +5,6 @@ loadfile:
   ; 载入根目录文件表
   push cx
   push bx
-  push ax                                         ; store the address contains filename
   mov ax, FATBaseAddr                             ; 设置数据缓冲基地址
   mov es, ax
   mov bx, FATOffsetAddr                           ; 设置数据缓冲偏移
@@ -16,29 +15,25 @@ loadfile:
   mov dx, RootStr
   call dispstr                                    ; notice the users that we've finished the items
 
-  mov dx, FATBaseAddr
-  mov ds, dx
   mov dx, FATOffsetAddr                           ; dx is initialized as Offset - Itemlen
   sub dx, CFAT12_RootItemLen
+  mov si, dx
   mov byte [MaxItem], CFAT12_RootEntCnt           ; maximal iteration limit
 
 search_file:
-  add dx, CFAT12_RootItemLen                      ; jump to next item
+  add si, CFAT12_RootItemLen                      ; jump to next item
   sub byte [MaxItem], 1                           ; decrease the limit counter
   cmp byte [MaxItem], 0
   je fin_unfound                                  ; we have meet the limit
   pop di
   push di                                         ; now di contains the filename
-  mov bx, 7
-  call compare
-  cmp ah, 0
+  cmp dword [es:si], "LOAD"                       ; compare first 4 chars
+  jne search_file
+  cmp dword [es:si+4], "ER  "
   jne search_file
 
-  pop ax                                          ; remove the filename from stack
-
 save_clusterNo:
-  mov si, dx                                      ; the corresponding item is located in DS:DX
-  mov ax, [ds:si + 26]                            ; no. cluster is located with an offset 26
+  mov ax, [gs:si + 26]                            ; no. cluster is located with an offset 26
   push ax                                         ; put the cluster no. in the stack in case it
                                                   ; probably be rewritten by readsec
   ; mov eax, [ds:si + 28]                         ; filelength, currently not used
@@ -51,6 +46,7 @@ load_FileAllocationTable:                         ; match found in DS:DX
   mov ax, CFAT12_SecNoOfFAT1                      ; we're going to load the first FAT
   mov cx, CFAT12_SecPerFAT
   call readsec
+
 
 load_filebody:                                    ; we need to locate the kernel through FAT
   pop ax
@@ -155,6 +151,7 @@ readsec_loop:
   mov al, 1                           ; 每次只读1个扇区
   mov ah, 2                           ; 设定为读取磁盘模式
   tryread:
+    call dispdebug
     int 0x13
     jc tryread                        ; 若失败则重新读取
   pop ax
@@ -187,7 +184,6 @@ readsec_end:
   pop ax
   ret
 
-%include "compare.asm"
 ; -------------------------------------- Data Segment -------------------------------------------
 MaxItem       db 0x00                  ; used when searching for certain files
 RootStr       db "Seek - ", 0x00

@@ -1,9 +1,28 @@
-org 0x9100
+; ----------------------------------------- 常量定义 ---------------------------------------------
+%include "memorymap.asm"
+; ---------------------------------------- program body ------------------------------------------
+org LoaderBaseAddr + LoaderOffsetAddr
 
-mov ah, 0
-mov al, 0x04
-int 0x10
+entry:
+  call clearscreen                                  ; clear the screen for following messages
+  mov ax, KernelName
+  mov bx, KernelBaseAddr
+  mov cx, KernelOffsetAddr
+  mov dx, KernelLoadStr
+  call dispstr
 
-jmp $
+  call loadfile
+  jmp finish
+  
+finish:
+  hlt
+  jmp finish
 
-LoaderReadyStr  db "Loader is Loaded", 0x00
+; ----------------------------------------- Data Segment -----------------------------------------
+KernelName    db "KERNEL  "
+KernelLoadStr db "Loading Kernel.bin - ", 0x00
+
+%include "display.asm"
+%include "debug.asm"
+%include "floppy.asm"
+

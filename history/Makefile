@@ -70,6 +70,7 @@ d5run:d5
 	sudo mkdir -p /mnt/img
 	sudo mount -o rw ./target/d5/image.img /mnt/img
 	sudo cp ./target/d5/loader.bin /mnt/img/loader.bin
+	sudo cp ./target/d5/loader.bin /mnt/img/kernel.bin
 	# -l option for lazy umount
 	sudo umount /mnt/img -l
 	sudo rm -rf /mnt/img
@@ -79,5 +80,6 @@ d5run:d5
 	nasm ./src/d5/bootloader/boot.asm -f bin -o ./target/d5/boot.bin -i ./src/d5/bootloader/
 
 ./target/d5/loader.bin: ./src/d5/bootloader/*.asm
-	nasm ./src/d5/bootloader/loader.asm -f bin -o ./target/d5/loader.bin -i ./src/d5/bootloader/
+	nasm ./src/d5/bootloader/loader.asm -f bin -o ./target/d5/loader.bin -l ./target/d5/loader.list \
+		-i ./src/d5/bootloader/
 
