@@ -1,0 +1,9 @@
+# this is a configuration file for virtual machine (Bochs)
+
+# memory size : 32Mb
+megs: 32
+
+# floppy drive 
+floppya: 1_44 = ../target/image.img, status = inserted
+
+boot: floppy
