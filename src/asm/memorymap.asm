@@ -11,14 +11,17 @@
 ; 0x9200 - 0x9A00 Loader.bin
 ; 0x9A00 -        Kernel.bin
 
-SectorSize         equ 0x00200
+; todo need rewrite !!!!!!!!!!
 
-BootLoaderBaseAddr equ 0x07c00
+SectorSize            equ 0x00200
 
-StackBaseAddr      equ BootLoaderBaseAddr + SectorSize
-FATBaseAddr        equ 0x08000
-FATOffsetAddr      equ 0x00000
-LoaderBaseAddr     equ FATBaseAddr + SectorSize * 14                ; 8000 - 9c00
-LoaderOffsetAddr   equ 0x00000
-KernelBaseAddr     equ LoaderBaseAddr + SectorSize * 4              ; 9c00 - ...
-KernelOffsetAddr   equ 0x00000
+BootLoaderOffsetAddr  equ 0x07c00
+
+StackBaseAddr         equ 0x00000
+StackOffsetAddr       equ 0x07e00                                      ; 0x7c00 + SectorSize
+FATBaseAddr           equ 0x08000                                      ; 0x80000
+FATOffsetAddr         equ 0x00000
+LoaderBaseAddr        equ 0x081c0                                      ; FATBaseAddr + SectorSize * 14 / 0x000F
+LoaderOffsetAddr      equ 0x00000
+KernelBaseAddr        equ LoaderBaseAddr + SectorSize * 4 / 0x000F     ; 9c00 - ...
+KernelOffsetAddr      equ 0x00000

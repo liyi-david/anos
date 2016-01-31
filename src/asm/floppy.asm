@@ -1,6 +1,13 @@
 ; 这个文件是用来存放软盘读写的 API
 ; http://blog.csdn.net/littlehedgehog/article/details/2147361
 
+; 输入参数:
+; AX - 待载入文件的文件名（前8位）地址
+; BX - 将要载入到的位置段
+; CX - 将要载入到的位置偏移
+
+; 返回值 - AH = 0 (正确载入)
+; AH = 1 (出现错误)
 loadfile:
   ; 载入根目录文件表
   push cx
@@ -13,8 +20,6 @@ loadfile:
   mov cx, CFAT12_RootSectors                      ; number of sectors
   call readsec                                    ; obtain the root directory items
   ; 根目录载入完毕
-  mov dx, RootStr
-  call dispstr
   ; 接下来查找根目录中的全部224项，检查是否存在指定名称的字符串
   mov dx, FATOffsetAddr
   sub dx, CFAT12_RootItemLen
@@ -25,6 +30,7 @@ loadfile:
 ; 过程中，es:si始终指向当前根目录项的首位值
 ; 首先我们将文件名地址出到di处
   pop di 
+
 search_file:
   add si, CFAT12_RootItemLen                      ; jump to next item
   sub byte [MaxItem], 1                           ; decrease the limit counter
@@ -32,7 +38,7 @@ search_file:
   je fin_fail                                     ; we have meet the limit
   mov eax, [di]
   cmp dword [es:si], eax                          ; compare first 4 chars
-  jne search_file
+  jne search_file                                 ; 如果不相同，则说明前4位不符
   mov eax, [di+4]
   cmp dword [es:si+4], eax
   jne search_file
@@ -44,9 +50,6 @@ save_clusterNo:
                                                   ; probably be rewritten by readsec
   ; mov eax, [ds:si + 28]                         ; filelength, currently not used
 
-  ; 提示已经找到匹配的文件
-  mov dx, MatchFound
-  call dispstr
 
 load_FileAllocationTable:                         ; match found in DS:DX
   mov bx, FATOffsetAddr
@@ -55,10 +58,12 @@ load_FileAllocationTable:                         ; match found in DS:DX
   call readsec
 
 load_filebody:                                    ; we need to locate the kernel through FAT
+  mov ax, es
+  mov gs, ax                                      ; put the base address of FAT to gs
   pop ax                                          ; 恢复簇号
   pop bx                                          ; initialize base address of loader.bin (line 7)
   mov es, bx
-  pop bx                                          ; initialize offset address of loader.bin (line 6)
+  pop bx                                          ; initialize offset address of loader.bin
   load_loader_loop:
     ; obtain the current cluster
     add ax, CFAT12_SecNoClstZero                  ; cluster no. -> sector no.
@@ -73,6 +78,7 @@ load_filebody:                                    ; we need to locate the kernel
                                                   ; broken and should not be used
     jb fin_fail
     ; otherwise we have finished kernel loading
+    mov ah, 0
     ret
     
 ; suppose AX stores the index of current cluster
@@ -90,8 +96,8 @@ nextcluster:
   mov ch, 0                                       ; let CX = CL
   add si, cx                                      ; CX == 0 - pick up the first two bytes, otherwise
                                                   ; the last two bytes (in the 3-byte block)
-  mov al, [es:si]                                 ; read two bytes
-  mov ah, [es:si + 1]                             ; high byte in memory to low byte in ax, vise versa
+  mov al, [gs:si]                                 ; read two bytes
+  mov ah, [gs:si + 1]                             ; high byte in memory to low byte in ax, vise versa
 
   cmp cl, 0
   je nextcluster_fin
@@ -105,13 +111,11 @@ nextcluster_fin:
   ret
 
 fin_fail:                  ; NO Kernels Found !!!!!!
-  mov dx, FailStr
-  call dispstr
-  jmp halt
+  mov ah, 1                ; 设置返回值
+  pop bx                   ; [重要] 在任意一个返回过程中都要正确清理堆栈
+  pop cx
+  ret
 
-halt:
-  hlt
-  jmp halt
 ; -------------------------------------- Assistant Functions ------------------------------------
 ; 中断13，AH = 2 - 读取
 ; 读磁盘
@@ -147,7 +151,6 @@ readsec:
 
 
 readsec_loop:
-  call dispdebug                    ; dispdebug函数用来输出调试信息
   push ax
   mov al, 1                           ; 每次只读1个扇区
   mov ah, 2                           ; 设定为读取磁盘模式
@@ -185,11 +188,8 @@ readsec_end:
   ret
 
 ; -------------------------------------- Data Segment -------------------------------------------
-MaxItem       db 0x00                  ; used when searching for certain files
-RootStr       db "Searching", 0x00
-MatchFound    db " -*- ", 0x00
-FailStr       db "FAIL", 0x00
-
+MaxItem       db 0x00                  
+; used when searching for certain files
 ; ------------------------------------------------------------------------------------------------
 ; 一些基于FAT12头的常量定义
 ; ------------------------------------------------------------------------------------------------
