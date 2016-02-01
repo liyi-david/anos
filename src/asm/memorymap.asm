@@ -13,15 +13,15 @@
 
 ; todo need rewrite !!!!!!!!!!
 
-SectorSize            equ 0x00200
+SectorSize            equ 0x0200
 
-BootLoaderOffsetAddr  equ 0x07c00
+BootLoaderOffsetAddr  equ 0x7c00
 
-StackBaseAddr         equ 0x00000
-StackOffsetAddr       equ 0x07e00                                      ; 0x7c00 + SectorSize
-FATBaseAddr           equ 0x08000                                      ; 0x80000
-FATOffsetAddr         equ 0x00000
-LoaderBaseAddr        equ 0x081c0                                      ; FATBaseAddr + SectorSize * 14 / 0x000F
-LoaderOffsetAddr      equ 0x00000
+StackBaseAddr         equ 0x0000
+StackOffsetAddr       equ 0x7e00                                      ; 0x7c00 + SectorSize
+FATBaseAddr           equ 0x8000                                      ; 0x80000
+FATOffsetAddr         equ 0x0000
+LoaderBaseAddr        equ 0x81c0                                      ; FATBaseAddr + SectorSize * 14 / 0x000F
+LoaderOffsetAddr      equ 0x0000
 KernelBaseAddr        equ LoaderBaseAddr + SectorSize * 4 / 0x000F     ; 9c00 - ...
-KernelOffsetAddr      equ 0x00000
+KernelOffsetAddr      equ 0x0000

@@ -2,34 +2,11 @@
 ; - 以0x0a作为换行符
 ; - 以0x00作为终止符
 ; - 输入字符串的地址由 AX:BX 给出
-mov ax, 1
-mov ax, 1
-mov ax, 1
-mov ax, 1
-mov ax, 1
-mov ax, 1
-mov ax, 1
-mov ax, 1
-mov ax, 1
-mov ax, 1
-mov ax, 1
-mov ax, 1
-mov ax, 1
-mov ax, 1
-mov ax, 1
-mov ax, 1
-mov ax, 1
-mov ax, 1
-mov ax, 1
-mov ax, 1
-mov ax, 1
-mov ax, 1
-mov ax, 1
-mov ax, 1
 
-[section .code]
 ; --------------------------------------- print a string ----------------------------------------
 printstr:
+  push ax
+  push bx
   push gs
   push si
   mov si, bx
@@ -38,7 +15,14 @@ printstr:
   printstr_loop:
     mov al, [gs:si]
     cmp al, 0
-    je printstr_end                ; 若AL = 0 则停止工作. 此处若改为JE entry则可无限向屏幕写入字符串
+    je printstr_end             ; 若AL = 0 则停止工作. 此处若改为JE entry则可无限向屏幕写入字符串
+    cmp al, 0x0a                ; 处理换行符
+    jne printstr_noendl
+    call printendl
+    inc si
+    jmp printstr_loop
+
+  printstr_noendl:
     mov bl, 01                  ; 选择前景色。不过不切换显示模式的话貌似无用
     mov ah, 0x0e                ; 选择中断功能：显示字符并后移光标
     int 0x10                    ; 调用显示中断
@@ -47,12 +31,25 @@ printstr:
 
   printstr_end:
     pop si
+    pop gs
     pop bx
     pop ax
     ret
 
 ; ----------------------------------------- print number -----------------------------------------
 ; AX/EAX - the word we need to print, e.g. 0x1234
+printsi:
+  push ax
+  mov ax, si
+  call printword
+  pop ax
+  ret
+
+printoffset:
+  pop ax
+  push ax
+  call printword
+  ret
 
 printdword:
   push eax

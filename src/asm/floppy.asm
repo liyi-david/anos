@@ -1,3 +1,21 @@
+; debug
+;printdebugsym:
+  ;push bx
+  ;push ax
+  ;mov bl, 0
+  ;mov ah, 0x0E
+  ;mov al, bh
+  ;add al, 0x30
+  ;int 0x10
+  ;mov al, bl
+  ;add al, 0x30
+  ;int 0x10
+  ;mov al, '/'
+  ;int 0x10
+  ;pop ax
+  ;pop bx
+  ;ret
+
 ; 这个文件是用来存放软盘读写的 API
 ; http://blog.csdn.net/littlehedgehog/article/details/2147361
 
@@ -35,7 +53,7 @@ search_file:
   add si, CFAT12_RootItemLen                      ; jump to next item
   sub byte [MaxItem], 1                           ; decrease the limit counter
   cmp byte [MaxItem], 0
-  je fin_fail                                     ; we have meet the limit
+  je loader_loader_fail                           ; we have meet the limit
   mov eax, [di]
   cmp dword [es:si], eax                          ; compare first 4 chars
   jne search_file                                 ; 如果不相同，则说明前4位不符
@@ -65,6 +83,12 @@ load_filebody:                                    ; we need to locate the kernel
   mov es, bx
   pop bx                                          ; initialize offset address of loader.bin
   load_loader_loop:
+    ; we should check the cluster number FIRSTLY
+    cmp ax, 0x0ff8                                ; if 0x0ff0 <= successor <= 0x0ff7, the cluster is
+                                                  ; broken and should not be used
+    jnb loader_loader_fin
+    cmp ax, 0x0ff0                                ; successor < 0x0ff0, that's good sectors
+    jnb loader_loader_fail                           ; continue reading
     ; obtain the current cluster
     add ax, CFAT12_SecNoClstZero                  ; cluster no. -> sector no.
       mov cx, 1                                   ; one cluster, one time (very important)
@@ -72,13 +96,17 @@ load_filebody:                                    ; we need to locate the kernel
       add bx, CFAT12_BytesPerSec                  ; move the address pointer
     sub ax, CFAT12_SecNoClstZero                  ; sector no. -> cluster no. before continuing
     call nextcluster                              ; find the index of the successing cluster
-    cmp ax, 0x0ff0                                ; successor < 0x0ff0, that's good sectors
-    jb load_loader_loop                           ; continue reading
-    cmp ax, 0x0ff8                                ; if 0x0ff0 <= successor <= 0x0ff7, the cluster is
-                                                  ; broken and should not be used
-    jb fin_fail
+    jmp load_loader_loop
+
+  loader_loader_fin:
     ; otherwise we have finished kernel loading
     mov ah, 0
+    ret
+
+  loader_loader_fail:        ; NO Kernels Found !!!!!!
+    mov ah, 1                ; 设置返回值
+    pop bx                   ; [重要] 在任意一个返回过程中都要正确清理堆栈
+    pop cx
     ret
     
 ; suppose AX stores the index of current cluster
@@ -110,11 +138,6 @@ nextcluster_fin:
   pop si
   ret
 
-fin_fail:                  ; NO Kernels Found !!!!!!
-  mov ah, 1                ; 设置返回值
-  pop bx                   ; [重要] 在任意一个返回过程中都要正确清理堆栈
-  pop cx
-  ret
 
 ; -------------------------------------- Assistant Functions ------------------------------------
 ; 中断13，AH = 2 - 读取
@@ -132,10 +155,14 @@ fin_fail:                  ; NO Kernels Found !!!!!!
 ; AX 起始扇区 (ranges from 0 to 2879)
 ; CX 待读个数
 ; ES:BX 数据缓冲区地址
+
+; NOTE: BX若跨越段则可能造成错误！！！
 readsec:
+  push bx
   push ax
   push dx
   push cx                             ; since bx is used in following lines, we need to store its
+  
   push bx                             ; value temporarily
   mov bl, CFAT12_SecPerTrk
   div bl                              ; AX % BL = AH, AX / BL = AL
@@ -185,6 +212,7 @@ readsec_secinc:
 readsec_end:
   pop dx
   pop ax
+  pop bx
   ret
 
 ; -------------------------------------- Data Segment -------------------------------------------

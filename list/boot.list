@@ -1,0 +1,381 @@
+     1                                  ; ----------------------------------------- 常量定义 ---------------------------------------------
+     2                                  %include "memorymap.asm"
+     3                              <1> ; ------------------------------------------------------------------------------------------------
+     4                              <1> ; memorymap.asm
+     5                              <1> ; - all base addreses and offsets are defined in this section
+     6                              <1> ; ------------------------------------------------------------------------------------------------
+     7                              <1> 
+     8                              <1> ; ----------------------------------------- 内存区划 ---------------------------------------------
+     9                              <1> ; 0x0000 - 0x7c00 系统预留
+    10                              <1> ; 0x7c00 - 0x7e00 引导扇区
+    11                              <1> ; 0x7e00 - 0x8000 堆栈(512 Byte)
+    12                              <1> ; 0x8000 - 0x9200 FAT(512 Byte * 9)
+    13                              <1> ; 0x9200 - 0x9A00 Loader.bin
+    14                              <1> ; 0x9A00 -        Kernel.bin
+    15                              <1> 
+    16                              <1> ; todo need rewrite !!!!!!!!!!
+    17                              <1> 
+    18                              <1> SectorSize            equ 0x0200
+    19                              <1> 
+    20                              <1> BootLoaderOffsetAddr  equ 0x7c00
+    21                              <1> 
+    22                              <1> StackBaseAddr         equ 0x0000
+    23                              <1> StackOffsetAddr       equ 0x7e00                                      ; 0x7c00 + SectorSize
+    24                              <1> FATBaseAddr           equ 0x8000                                      ; 0x80000
+    25                              <1> FATOffsetAddr         equ 0x0000
+    26                              <1> LoaderBaseAddr        equ 0x81c0                                      ; FATBaseAddr + SectorSize * 14 / 0x000F
+    27                              <1> LoaderOffsetAddr      equ 0x0000
+    28                              <1> KernelBaseAddr        equ LoaderBaseAddr + SectorSize * 4 / 0x000F     ; 9c00 - ...
+    29                              <1> KernelOffsetAddr      equ 0x0000
+    30                                  ; ------------------------------------------ 程序主体 --------------------------------------------
+    31                                  ; ORG 代表了初始偏移量
+    32                                  org   BootLoaderOffsetAddr
+    33                                  ;--------------------------------------- FAT12 格式描述 ------------------------------------------
+    34                                  ; FAT12 引导扇区格式参见 http://blog.sina.com.cn/s/blog_3edcf6b80100cr08.html
+    35 00000000 EB3C                    jmp entry
+    36 00000002 90                      nop
+    37                                  %include "fat12.asm"
+    38                              <1> ; -----------------------------------------------------------------------------------------------
+    39                              <1> ; fat12.asm
+    40                              <1> ; - 这个文件描述了一个标准FAT12的开头
+    41                              <1> ; - 需要注意的是，在引用本文件前，需要有额外的两行
+    42                              <1> ; - jmp (short) entry   指定入口
+    43                              <1> ; - nop                 null operation
+    44                              <1> ; -----------------------------------------------------------------------------------------------
+    45 00000003 414E4F5349504C20    <1> FAT12_OEMName      db    "ANOSIPL "      ; OEM字符串，8字节（通常为格式化本磁盘的操作系统名称及版本）
+    46 0000000B 0002                <1> FAT12_BytesPerSec  dw    512             ; 每个扇区(sector)大小，必须为512(B)
+    47 0000000D 01                  <1> FAT12_SecPerClus   db    1               ; 簇(cluster)的大小，必须为1（个扇区）
+    48 0000000E 0100                <1> FAT12_RsvdSecCnt   dw    1               ; Boot记录所占用的扇区数
+    49 00000010 02                  <1> FAT12_NumFATs      db    2               ; FAT的个数（必须为2）
+    50 00000011 E000                <1> FAT12_RootEntCnt   dw    224             ; 根目录的文件数最大值（一般设成224项）
+    51 00000013 400B                <1> FAT12_TotSec16     dw    2880            ; 该磁盘的大小,即逻辑扇区总数（必须设成2880扇区，即1440KB）
+    52 00000015 F0                  <1> FAT12_Media        db    0xf0            ; 磁盘的种类/媒体描述符（必须为F0）
+    53 00000016 0900                <1> FAT12_SecPerFAT    dw    9               ; 每个FAT的长度（必须是9扇区）
+    54 00000018 1200                <1> FAT12_SecPerTrk    dw    18              ; 每个磁道的扇区数（必须是18）
+    55 0000001A 0200                <1> FAT12_NumHeads     dw    2               ; 磁头数（必须是2）
+    56 0000001C 00000000            <1> FAT12_HiddSec      dd    0               ; 隐藏扇区数
+    57 00000020 400B0000            <1> FAT12_TolSec32     dd    2880            ; 如果BPB_TotSec16是0，则在这里记录扇区总数
+    58 00000024 00                  <1> FAT12_DrvNum       db    0               ; 中断13的驱动器号
+    59 00000025 00                  <1> FAT12_Reserved1    db    0               ; 保留字段
+    60 00000026 29                  <1> FAT12_BootSig      db    29h             ; 扩展引导标记(29h)
+    61 00000027 00000000            <1> FAT12_VolID        dd    0               ; 卷序列号
+    62 0000002B 416E204F5320416C70- <1> FAT12_VolLbl       db    "An OS Alpha"   ; 卷标（11字节）
+    63 00000034 6861                <1>
+    64 00000036 4641543132202020    <1> FAT12_FilsSysType  db    "FAT12   "      ; 文件系统类型（8字节）
+    65                                  
+    66                                  ; BIOS中断表参见 http://www.cnblogs.com/walfud/articles/2980774.html
+    67                                  
+    68                                  entry:
+    69                                    ; 刷新屏幕
+    70 0000003E E82900                    call clearscreen
+    71                                    ; 初始化堆栈
+    72 00000041 B80000                    mov ax, StackBaseAddr
+    73 00000044 8ED0                      mov ss, ax
+    74                                    ; 指定输入文件地址
+    75 00000046 B8[AD01]                  mov ax, LoaderName
+    76 00000049 BBC081                    mov bx, LoaderBaseAddr
+    77 0000004C B90000                    mov cx, LoaderOffsetAddr
+    78 0000004F E84900                    call loadfile
+    79                                    ; 检查返回值
+    80 00000052 80FC00                    cmp ah, 0
+    81 00000055 750B                      jne failed
+    82                                  
+    83                                  finish:                          ; 程序结束
+    84 00000057 BA[9F01]                  mov dx, FinishFlag
+    85 0000005A E82300                    call dispstr
+    86 0000005D EA0000C081                jmp LoaderBaseAddr:LoaderOffsetAddr
+    87                                  
+    88                                  failed:
+    89 00000062 BA[A601]                  mov dx, FailFlag
+    90 00000065 E81800                    call dispstr
+    91 00000068 EBFE                      jmp $
+    92                                  
+    93                                  ; ---------------------------- 显示信息：公用代码 ------------------------------------------------
+    94                                  clearscreen:
+    95 0000006A 50                        push ax
+    96 0000006B 53                        push bx
+    97 0000006C 51                        push cx
+    98 0000006D B000                      mov al, 0
+    99 0000006F B73F                      mov bh, 0x3F
+   100 00000071 B90000                    mov cx, 0
+   101 00000074 B250                      mov dl, 80                  ; column number of the right below corner
+   102 00000076 B619                      mov dh, 25                  ; row number of ....
+   103 00000078 B406                      mov ah, 6                   ; function set to `roll up`
+   104 0000007A CD10                      int 0x10                    ; call the interruption
+   105 0000007C 59                        pop cx
+   106 0000007D 5B                        pop bx
+   107 0000007E 58                        pop ax
+   108 0000007F C3                        ret
+   109                                  
+   110                                  ; dispstr
+   111                                  ; - dx 在屏幕显示起始位置为sp:dx的字符串
+   112                                  dispstr:
+   113 00000080 50                        push ax                     ; NOTE these registers must be stored !!!!!!!!!!!!!!!!!!!!!!!!!!
+   114 00000081 53                        push bx
+   115 00000082 56                        push si
+   116 00000083 89D6                      mov si, dx
+   117                                  
+   118                                  dispstr_loop:
+   119 00000085 2E8A04                    mov al, [cs:si]
+   120 00000088 3C00                      cmp al, 0
+   121 0000008A 740B                      je dispstr_end              ; 若AL = 0 则停止工作. 此处若改为JE entry则可无限向屏幕写入字符串
+   122 0000008C B301                      mov bl, 01                  ; 选择前景色。不过不切换显示模式的话貌似无用
+   123 0000008E B40E                      mov ah, 0x0e                ; 选择中断功能：显示字符并后移光标
+   124 00000090 CD10                      int 0x10                    ; 调用显示中断
+   125 00000092 83C601                    add si, 1
+   126 00000095 EBEE                      jmp dispstr_loop
+   127                                  
+   128                                  dispstr_end:
+   129 00000097 5E                        pop si
+   130 00000098 5B                        pop bx
+   131 00000099 58                        pop ax
+   132 0000009A C3                        ret
+   133                                  
+   134                                  %include "floppy.asm"
+   135                              <1> ; debug
+   136                              <1> ;printdebugsym:
+   137                              <1>   ;push bx
+   138                              <1>   ;push ax
+   139                              <1>   ;mov bl, 0
+   140                              <1>   ;mov ah, 0x0E
+   141                              <1>   ;mov al, bh
+   142                              <1>   ;add al, 0x30
+   143                              <1>   ;int 0x10
+   144                              <1>   ;mov al, bl
+   145                              <1>   ;add al, 0x30
+   146                              <1>   ;int 0x10
+   147                              <1>   ;mov al, '/'
+   148                              <1>   ;int 0x10
+   149                              <1>   ;pop ax
+   150                              <1>   ;pop bx
+   151                              <1>   ;ret
+   152                              <1> 
+   153                              <1> ; 这个文件是用来存放软盘读写的 API
+   154                              <1> ; http://blog.csdn.net/littlehedgehog/article/details/2147361
+   155                              <1> 
+   156                              <1> ; 输入参数:
+   157                              <1> ; AX - 待载入文件的文件名（前8位）地址
+   158                              <1> ; BX - 将要载入到的位置段
+   159                              <1> ; CX - 将要载入到的位置偏移
+   160                              <1> 
+   161                              <1> ; 返回值 - AH = 0 (正确载入)
+   162                              <1> ; AH = 1 (出现错误)
+   163                              <1> loadfile:
+   164                              <1>   ; 载入根目录文件表
+   165 0000009B 51                  <1>   push cx
+   166 0000009C 53                  <1>   push bx
+   167 0000009D 50                  <1>   push ax
+   168 0000009E B80080              <1>   mov ax, FATBaseAddr                             ; 设置数据缓冲基地址
+   169 000000A1 8EC0                <1>   mov es, ax
+   170 000000A3 BB0000              <1>   mov bx, FATOffsetAddr                           ; 设置数据缓冲偏移
+   171 000000A6 B81300              <1>   mov ax, CFAT12_SecNoOfRoot                      ; 0 - boot sector, 1 - 9/10 - 18 : FAT1/2
+   172 000000A9 B90E00              <1>   mov cx, CFAT12_RootSectors                      ; number of sectors
+   173 000000AC E89C00              <1>   call readsec                                    ; obtain the root directory items
+   174                              <1>   ; 根目录载入完毕
+   175                              <1>   ; 接下来查找根目录中的全部224项，检查是否存在指定名称的字符串
+   176 000000AF BA0000              <1>   mov dx, FATOffsetAddr
+   177 000000B2 83EA20              <1>   sub dx, CFAT12_RootItemLen
+   178 000000B5 89D6                <1>   mov si, dx
+   179 000000B7 C606[9E01]E0        <1>   mov byte [MaxItem], CFAT12_RootEntCnt           ; maximal iteration limit
+   180                              <1> 
+   181                              <1> ; 查找Loader
+   182                              <1> ; 过程中，es:si始终指向当前根目录项的首位值
+   183                              <1> ; 首先我们将文件名地址出到di处
+   184 000000BC 5F                  <1>   pop di 
+   185                              <1> 
+   186                              <1> search_file:
+   187 000000BD 83C620              <1>   add si, CFAT12_RootItemLen                      ; jump to next item
+   188 000000C0 802E[9E01]01        <1>   sub byte [MaxItem], 1                           ; decrease the limit counter
+   189 000000C5 803E[9E01]00        <1>   cmp byte [MaxItem], 0
+   190 000000CA 7450                <1>   je loader_loader_fail                           ; we have meet the limit
+   191 000000CC 668B05              <1>   mov eax, [di]
+   192 000000CF 26663904            <1>   cmp dword [es:si], eax                          ; compare first 4 chars
+   193 000000D3 75E8                <1>   jne search_file                                 ; 如果不相同，则说明前4位不符
+   194 000000D5 668B4504            <1>   mov eax, [di+4]
+   195 000000D9 2666394404          <1>   cmp dword [es:si+4], eax
+   196 000000DE 75DD                <1>   jne search_file
+   197                              <1> 
+   198                              <1> ; 若找到文件，则马上从项目中取出相应的首簇号
+   199                              <1> save_clusterNo:
+   200 000000E0 268B441A            <1>   mov ax, [es:si + 26]                            ; no. cluster is located with an offset 26
+   201 000000E4 50                  <1>   push ax                                         ; put the cluster no. in the stack in case it
+   202                              <1>                                                   ; probably be rewritten by readsec
+   203                              <1>   ; mov eax, [ds:si + 28]                         ; filelength, currently not used
+   204                              <1> 
+   205                              <1> 
+   206                              <1> load_FileAllocationTable:                         ; match found in DS:DX
+   207 000000E5 BB0000              <1>   mov bx, FATOffsetAddr
+   208 000000E8 B80100              <1>   mov ax, CFAT12_SecNoOfFAT1                      ; we're going to load the first FAT
+   209 000000EB B90900              <1>   mov cx, CFAT12_SecPerFAT
+   210 000000EE E85A00              <1>   call readsec
+   211                              <1> 
+   212                              <1> load_filebody:                                    ; we need to locate the kernel through FAT
+   213 000000F1 8CC0                <1>   mov ax, es
+   214 000000F3 8EE8                <1>   mov gs, ax                                      ; put the base address of FAT to gs
+   215 000000F5 58                  <1>   pop ax                                          ; 恢复簇号
+   216 000000F6 5B                  <1>   pop bx                                          ; initialize base address of loader.bin (line 7)
+   217 000000F7 8EC3                <1>   mov es, bx
+   218 000000F9 5B                  <1>   pop bx                                          ; initialize offset address of loader.bin
+   219                              <1>   load_loader_loop:
+   220                              <1>     ; we should check the cluster number FIRSTLY
+   221 000000FA 3DF80F              <1>     cmp ax, 0x0ff8                                ; if 0x0ff0 <= successor <= 0x0ff7, the cluster is
+   222                              <1>                                                   ; broken and should not be used
+   223 000000FD 731A                <1>     jnb loader_loader_fin
+   224 000000FF 3DF00F              <1>     cmp ax, 0x0ff0                                ; successor < 0x0ff0, that's good sectors
+   225 00000102 7318                <1>     jnb loader_loader_fail                           ; continue reading
+   226                              <1>     ; obtain the current cluster
+   227 00000104 83C01F              <1>     add ax, CFAT12_SecNoClstZero                  ; cluster no. -> sector no.
+   228 00000107 B90100              <1>       mov cx, 1                                   ; one cluster, one time (very important)
+   229 0000010A E83E00              <1>       call readsec                                ; read one sector as a cluster
+   230 0000010D 81C30002            <1>       add bx, CFAT12_BytesPerSec                  ; move the address pointer
+   231 00000111 83E81F              <1>     sub ax, CFAT12_SecNoClstZero                  ; sector no. -> cluster no. before continuing
+   232 00000114 E80A00              <1>     call nextcluster                              ; find the index of the successing cluster
+   233 00000117 EBE1                <1>     jmp load_loader_loop
+   234                              <1> 
+   235                              <1>   loader_loader_fin:
+   236                              <1>     ; otherwise we have finished kernel loading
+   237 00000119 B400                <1>     mov ah, 0
+   238 0000011B C3                  <1>     ret
+   239                              <1> 
+   240                              <1>   loader_loader_fail:        ; NO Kernels Found !!!!!!
+   241 0000011C B401                <1>     mov ah, 1                ; 设置返回值
+   242 0000011E 5B                  <1>     pop bx                   ; [重要] 在任意一个返回过程中都要正确清理堆栈
+   243 0000011F 59                  <1>     pop cx
+   244 00000120 C3                  <1>     ret
+   245                              <1>     
+   246                              <1> ; suppose AX stores the index of current cluster
+   247                              <1> ; *nextcluster* generates the successor cluster index, stored in AX
+   248                              <1> nextcluster:
+   249 00000121 56                  <1>   push si                                         ; put two registers in stack
+   250 00000122 53                  <1>   push bx
+   251 00000123 88C1                <1>   mov cl, al
+   252 00000125 80E101              <1>   and cl, 1                                       ; CL = AX % 2 = 0 / 1
+   253 00000128 D1E8                <1>   shr ax, 1                                       ; AX /= 2
+   254 0000012A 89C3                <1>   mov bx, ax
+   255 0000012C D1E0                <1>   shl ax, 1                                       ; AX = 3 * AX
+   256 0000012E 01D8                <1>   add ax, bx
+   257 00000130 89C6                <1>   mov si, ax                                      ; SI set to the offset of current 3-byte
+   258 00000132 B500                <1>   mov ch, 0                                       ; let CX = CL
+   259 00000134 01CE                <1>   add si, cx                                      ; CX == 0 - pick up the first two bytes, otherwise
+   260                              <1>                                                   ; the last two bytes (in the 3-byte block)
+   261 00000136 658A04              <1>   mov al, [gs:si]                                 ; read two bytes
+   262 00000139 658A6401            <1>   mov ah, [gs:si + 1]                             ; high byte in memory to low byte in ax, vise versa
+   263                              <1> 
+   264 0000013D 80F900              <1>   cmp cl, 0
+   265 00000140 7403                <1>   je nextcluster_fin
+   266 00000142 C1E804              <1>   shr ax, 4
+   267                              <1> 
+   268                              <1> nextcluster_fin:
+   269 00000145 25FF0F              <1>   and ax, 0000111111111111b                       ; pick up the lower 12-bit since all cluster
+   270                              <1>                                                   ; descriptor contains only 12 bit
+   271 00000148 5B                  <1>   pop bx
+   272 00000149 5E                  <1>   pop si
+   273 0000014A C3                  <1>   ret
+   274                              <1> 
+   275                              <1> 
+   276                              <1> ; -------------------------------------- Assistant Functions ------------------------------------
+   277                              <1> ; 中断13，AH = 2 - 读取
+   278                              <1> ; 读磁盘
+   279                              <1> ;   AL=扇区数
+   280                              <1> ;   CH,CL=磁盘号,扇区号
+   281                              <1> ;   DH,DL=磁头号,驱动器号
+   282                              <1> ;   ES:BX=数据缓冲区地址  
+   283                              <1> ; Return Value
+   284                              <1> ;   读成功:AH=0
+   285                              <1> ;   AL=读取的扇区数
+   286                              <1> ;   读失败:AH=出错代码
+   287                              <1> 
+   288                              <1> ; readsec 读逻辑扇区
+   289                              <1> ; AX 起始扇区 (ranges from 0 to 2879)
+   290                              <1> ; CX 待读个数
+   291                              <1> ; ES:BX 数据缓冲区地址
+   292                              <1> 
+   293                              <1> ; NOTE: BX若跨越段则可能造成错误！！！
+   294                              <1> readsec:
+   295 0000014B 53                  <1>   push bx
+   296 0000014C 50                  <1>   push ax
+   297 0000014D 52                  <1>   push dx
+   298 0000014E 51                  <1>   push cx                             ; since bx is used in following lines, we need to store its
+   299                              <1>   
+   300 0000014F 53                  <1>   push bx                             ; value temporarily
+   301 00000150 B312                <1>   mov bl, CFAT12_SecPerTrk
+   302 00000152 F6F3                <1>   div bl                              ; AX % BL = AH, AX / BL = AL
+   303 00000154 5B                  <1>   pop bx
+   304 00000155 88C6                <1>   mov dh, al                          ; 求磁头号
+   305 00000157 80E601              <1>   and dh, 0x01                        ; 若是偶数，则磁头号为0，否则为1
+   306 0000015A D0E8                <1>   shr al, 1
+   307 0000015C 88C5                <1>   mov ch, al                          ; 柱面号 or 磁道号 
+   308 0000015E 88E1                <1>   mov cl, ah                          ; 起始扇区号
+   309 00000160 80C101              <1>   add cl, 1                           ; obviously cl in [0, 17] and we need it to be [1, 18]
+   310 00000163 B200                <1>   mov dl, CFAT12_DrvNum
+   311 00000165 58                  <1>   pop ax                              ; 将待读个数CX弹到AX中，用AX为计数器
+   312                              <1> 
+   313                              <1> 
+   314                              <1> readsec_loop:
+   315 00000166 50                  <1>   push ax
+   316 00000167 B001                <1>   mov al, 1                           ; 每次只读1个扇区
+   317 00000169 B402                <1>   mov ah, 2                           ; 设定为读取磁盘模式
+   318                              <1>   tryread:
+   319 0000016B CD13                <1>     int 0x13
+   320 0000016D 72FC                <1>     jc tryread                        ; 若失败则重新读取
+   321 0000016F 58                  <1>   pop ax
+   322 00000170 81C30002            <1>   add bx, 512                         ; 指针向后一个扇区
+   323 00000174 E80A00              <1>   call readsec_secinc                 ; 扇区自增
+   324 00000177 83E801              <1>   sub ax, 1                           ; 计数器 -1
+   325 0000017A 83F800              <1>   cmp ax, 0
+   326 0000017D 741B                <1>   je readsec_end
+   327 0000017F EBE5                <1>   jmp readsec_loop
+   328                              <1> 
+   329                              <1> ; 子函数，使得逻辑扇区+1并计算对应的柱面-磁头-扇区表示
+   330                              <1> readsec_secinc:
+   331 00000181 80C101              <1>   add cl, 1
+   332 00000184 80F913              <1>   cmp cl, 19
+   333 00000187 7510                <1>   jne readsec_secinc_end              ; 若扇区号尚不足19，自增后可直接退出
+   334                              <1>                                       ; 扇区范围为 1-19 [重要!!!!!!!!!!!!!!!!!]
+   335 00000189 B101                <1>     mov cl, 1                         ; 否则变化磁头号
+   336 0000018B 80FE00              <1>     cmp dh, 0                         ; 若磁头号为0, 则磁道号加1
+   337 0000018E 7504                <1>     jne readsec_secinc_cyninc         ; 若磁头号已经为1, 则磁道号清零并增加柱面号
+   338 00000190 B601                <1>     mov dh, 1                         ; 若磁头号尚未0, 则磁道号+1并退出
+   339 00000192 EB05                <1>     jmp readsec_secinc_end
+   340                              <1>   readsec_secinc_cyninc:              ; 柱面号需+1
+   341 00000194 B600                <1>     mov dh, 0
+   342 00000196 80C501              <1>     add ch, 1
+   343                              <1>   readsec_secinc_end:
+   344 00000199 C3                  <1>     ret
+   345                              <1> 
+   346                              <1> readsec_end:
+   347 0000019A 5A                  <1>   pop dx
+   348 0000019B 58                  <1>   pop ax
+   349 0000019C 5B                  <1>   pop bx
+   350 0000019D C3                  <1>   ret
+   351                              <1> 
+   352                              <1> ; -------------------------------------- Data Segment -------------------------------------------
+   353 0000019E 00                  <1> MaxItem       db 0x00                  
+   354                              <1> ; used when searching for certain files
+   355                              <1> ; ------------------------------------------------------------------------------------------------
+   356                              <1> ; 一些基于FAT12头的常量定义
+   357                              <1> ; ------------------------------------------------------------------------------------------------
+   358                              <1> 
+   359                              <1> CFAT12_DrvNum            equ   0
+   360                              <1> CFAT12_BytesPerSec       equ   512
+   361                              <1> CFAT12_SecPerFAT         equ   9                                            ; number of sectors in each FAT
+   362                              <1> CFAT12_SecPerTrk         equ   18                                           ; number of sectors in each Track
+   363                              <1> CFAT12_RootSectors       equ   CFAT12_RootEntCnt * CFAT12_RootItemLen / 512 ; number of sectors that contains root items
+   364                              <1> CFAT12_SecNoOfRoot       equ   CFAT12_SecNoOfFAT1 + 2 * CFAT12_SecPerFAT    ; index of root directory table's starting location
+   365                              <1> CFAT12_SecNoOfFAT1       equ   1                                            ; index of FAT1's starting section
+   366                              <1> CFAT12_RootEntCnt        equ   224                                          ; maximal number of items in root directory
+   367                              <1> CFAT12_SecNoClstZero     equ   CFAT12_SecNoOfRoot + CFAT12_RootSectors - 2  ; the sector index of cluster 0
+   368                              <1>                                                                             ; since the data cluster starts from cluster 2
+   369                              <1>                                                                             ; we need to decrease 2 here
+   370                              <1> 
+   371                              <1> CFAT12_RootItemLen       equ   32
+   372                                  ; ---------------------------------------- 数据段 ------------------------------------------------
+   373 0000019F 46494E49534800          FinishFlag    db "FINISH", 0x00
+   374 000001A6 4641494C454400          FailFlag      db "FAILED", 0x00
+   375 000001AD 4C4F414445522020        LoaderName    db "LOADER  "
+   376                                  
+   377 000001B5 00<rept>                TIMES (0x01FE-($-$$)) db 0    ; 填充当前扇区。不知道为何原文给定的填充结束位置为0x7dfe
+   378                                                                ; 不过这个填充位置显然是错的，因为这样55AA标志便远在引导扇区之外
+   379                                                                ; 因此我们将填充位置改为 0x01FE，因为 0x01FE + 2 = 0x0200恰好为
+   380                                                                ; 第一个扇区的长度
+   381 000001FE 55AA                    DB    0x55, 0xaa
