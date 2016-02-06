@@ -28,7 +28,7 @@ jne failed_loadingkernel
 
 ; 内核载入完成
 mov ax, cs
-mov bx, KernelReadyStr
+mov bx, DoneStr
 call printstr
 
 mov ax, cs
@@ -72,8 +72,7 @@ failed:
 ; ---------------------------------------- 数据段 ------------------------------------------------
 [section .data]
 LoaderReadyStr     db  "Boot Loader online, trying to locate the kernel ... ", 0x00
-KernelReadyStr     db  "DONE.", 0x0a, 0x00
+DoneStr            db  "DONE.", 0x0a, 0x00
 ProtectedModeIn    db  "Jumping into protected mode ... ", 0x00
 FailLoadingStr     db  "FAILED", 0x0a, 0x00
 KernelName         db  "KERNEL  "
-ProtectedReadyStr  db  "Protected Mode is ready, now analyzing kernel binary ... ", 0x00

@@ -12,8 +12,17 @@ entry32:
   mov gs, ax
   mov esp, Kernel32SegBaseAddr - Stack32BaseAddr - 16
   mov ebp, esp
-  mov edx, ProtectedReadyStr
+
+  mov edx, DoneStr
   call print
+
+  ; 分析ELF格式的内核（现已经被载入到内存中）
+  mov edx, AnalyzeElfStr
+  call print
+
   jmp $
 
 %include "print32.asm"
+
+[section .data]
+AnalyzeElfStr     db  "Analyzing elf kernel binary ... ", 0x00
