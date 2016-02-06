@@ -20,7 +20,7 @@
 ; http://blog.csdn.net/littlehedgehog/article/details/2147361
 
 ; 输入参数:
-; AX - 待载入文件的文件名（前8位）地址
+; AX - 待载入文件的文件名（前8位）地址（所在位置）
 ; BX - 将要载入到的位置段
 ; CX - 将要载入到的位置偏移
 
@@ -54,10 +54,10 @@ search_file:
   sub byte [MaxItem], 1                           ; decrease the limit counter
   cmp byte [MaxItem], 0
   je loader_loader_fail                           ; we have meet the limit
-  mov eax, [di]
+  mov eax, [ds:di]
   cmp dword [es:si], eax                          ; compare first 4 chars
   jne search_file                                 ; 如果不相同，则说明前4位不符
-  mov eax, [di+4]
+  mov eax, [ds:di+4]
   cmp dword [es:si+4], eax
   jne search_file
 

@@ -18,10 +18,13 @@ SectorSize            equ 0x0200
 BootLoaderOffsetAddr  equ 0x7c00
 
 StackBaseAddr         equ 0x0000
-StackOffsetAddr       equ 0x7e00                                      ; 0x7c00 + SectorSize
-FATBaseAddr           equ 0x8000                                      ; 0x80000
+StackOffsetAddr       equ 0x7e00                    ; 0x7c00 + SectorSize
+FATBaseAddr           equ 0x8000                    ; 0x80000
 FATOffsetAddr         equ 0x0000
-LoaderBaseAddr        equ 0x81c0                                      ; FATBaseAddr + SectorSize * 14 / 0x000F
+LoaderBaseAddr        equ 0x81c0                    ; FATBaseAddr + SectorSize * 14 / 0x000F
 LoaderOffsetAddr      equ 0x0000
-KernelBaseAddr        equ LoaderBaseAddr + SectorSize * 4 / 0x000F     ; 9c00 - ...
+KernelBaseAddr        equ 0x8240                    ; LoaderBaseAddr + SectorSize * 4 / 0x000F
 KernelOffsetAddr      equ 0x0000
+
+Stack32BaseAddr       equ 0x00010000
+Kernel32SegBaseAddr   equ 0x00020000                ; Kernel in 32 bit would be located outside 1MB

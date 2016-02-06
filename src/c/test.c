@@ -1,7 +1,5 @@
-int f(int a, int b) {
-  return a + b;
-}
-
-int main() {
-  return f(1,2);
+int main(int argc, char ** argv) {
+  for (;;) {
+  }
+  return 0;
 }

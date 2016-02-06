@@ -19,5 +19,6 @@ handle SIGTRAP nostop noprint
 b *0x7c00
 # breakpoint: the final jump of boot sector
 b *0x7c5d
-b *0x81c00
+# breakpoint: before jump to kernel
+b *0x81c0:0x0000
 

@@ -1,0 +1,18 @@
+# memory size
+megs: 32
+
+# machine configuration
+romimage: file=$BXSHARE/BIOS-bochs-latest
+vgaromimage: file=$BXSHARE/VGABIOS-lgpl-latest
+
+# the script need to be executed by Makefile
+floppya: 1_44=target/image.img, status=inserted
+
+boot: floppy
+
+# use sdl instead of x
+# display_library: sdl  
+
+# gdb
+# log: bochslog.txt
+# gdbstub: enabled=1, port=1234, text_base=0, data_base=0, bss_base=0

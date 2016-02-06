@@ -3,6 +3,8 @@
 ; - 以0x00作为终止符
 ; - 输入字符串的地址由 AX:BX 给出
 
+[section .text]
+
 ; --------------------------------------- print a string ----------------------------------------
 printstr:
   push ax
@@ -36,21 +38,68 @@ printstr:
     pop ax
     ret
 
-; ----------------------------------------- print number -----------------------------------------
-; AX/EAX - the word we need to print, e.g. 0x1234
-printsi:
+; ----------------------------------------- print memory -----------------------------------------
+; AX - base address
+; BX - offset
+; - in this function, we're going to print ... bytes of memory starting from AX:BX
+; - 16 bytes per line
+printmemory:
+  push gs
+  push si
   push ax
+  push bx
+
+  call printendl                 ; first we provide a endline
+  mov gs, ax                     ; set base address
+  mov si, bx                     ; set offset
+  mov ax, 0x10                   ; print 16 lines
+  printmemory_loop:
+    call printmemoryaddr         ; print the address
+    call printspace
+
+    ; inner loop: print one line
+    push ax
+      mov ax, 16
+      printmemory_lineloop:
+        push ax
+        mov al, [gs:si]
+        call printbyte
+        pop ax
+        call printspace
+        add si, 1
+        dec ax
+        cmp ax, 0
+        jne printmemory_lineloop
+    pop ax
+
+    call printendl
+
+    dec ax
+    cmp ax, 0
+    jne printmemory_loop
+
+  ; finally, use an endl to split between other messages
+  call printendl
+  pop bx
+  pop ax
+  pop si
+  pop gs
+  ret
+
+printmemoryaddr:
+  push ax
+  mov ax, gs
+  call printword
+  mov al, ':'
+  call printsymbol
   mov ax, si
   call printword
   pop ax
   ret
 
-printoffset:
-  pop ax
-  push ax
-  call printword
-  ret
 
+; ----------------------------------------- print number -----------------------------------------
+; AX/EAX - the word we need to print, e.g. 0x1234
 printdword:
   push eax
   shr eax, 16
@@ -60,36 +109,34 @@ printdword:
   ret
 
 printword:
-  push bx
-  push cx
   push ax
-  mov cx, ax
+  push ax                          ; preserve ax firstly
+  mov al, ah                       ; print the high 8 bits
+  call printbyte
+  pop ax                           ; restore ax and print the lower 8 bits
+  call printbyte
+  pop ax
+  ret
+
+; the byte should be stored in AL
+printbyte:
+  push bx
+  push ax
   mov bl, 0
   mov ah, 0x0E
-  ; display 1
-  mov al, ch
-  shr al, 4
-  call printword_al2chr
-  int 0x10
-  ; display 2
-  mov al, ch
+  mov bh, al                       ; backup al with bh
+  shr al, 4                        ; high 4-bits first
   and al, 00001111b
   call printword_al2chr
   int 0x10
-  ; display 3
-  mov al, cl
-  shr al, 4
-  call printword_al2chr
-  int 0x10
-  ; display 4
-  mov al, cl
+  mov al, bh                       ; restore al
   and al, 00001111b
   call printword_al2chr
   int 0x10
   pop ax
-  pop cx
   pop bx
   ret
+
 
 printword_al2chr:
   add al, 0x30
@@ -108,7 +155,7 @@ screen_reset:
   push dx
   ; step 1. reset color
   mov al, 0
-  mov bh, 0x3F
+  mov bh, 0x4F
   mov cx, 0
   mov dl, 80                  ; column number of the right below corner
   mov dh, 25                  ; row number of ....
@@ -145,6 +192,16 @@ printhexhead:
   mov al, '0'
   int 0x10
   mov al, 'x'
+  int 0x10
+  pop ax
+  pop bx
+  ret
+
+printsymbol:
+  push bx
+  push ax
+  mov bl, 0
+  mov ah, 0x0E
   int 0x10
   pop ax
   pop bx
